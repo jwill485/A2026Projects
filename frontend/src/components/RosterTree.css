@@ -1,0 +1,92 @@
+.tree-node {
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  margin: 0.4rem 0;
+  padding: 0.4rem 0.6rem;
+  background: #1c1c1c;
+}
+
+.tree-node > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #eee;
+}
+
+.battalion-node {
+  background: #14202e;
+}
+
+.company-node {
+  background: #1c2a1c;
+  margin-left: 0.5rem;
+}
+
+.platoon-node {
+  background: #24242e;
+  margin-left: 1rem;
+}
+
+.squad-node {
+  background: #1c1c1c;
+  margin-left: 1.5rem;
+}
+
+.company-hq-row {
+  margin: 0.3rem 0 0.3rem 0.5rem;
+  color: #bbb;
+  font-size: 0.9rem;
+}
+
+.member-list {
+  list-style: none;
+  margin: 0.3rem 0 0 0.5rem;
+  padding: 0;
+}
+
+.member-list li {
+  padding: 0.15rem 0;
+  color: #ddd;
+}
+
+.soldier-name {
+  color: #fff;
+}
+
+.soldier-username {
+  color: #888;
+  font-size: 0.85em;
+}
+
+.vacant {
+  color: #d97757;
+  font-style: italic;
+}
+
+.count-badge {
+  margin-left: 0.6rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: #333;
+  color: #ccc;
+  font-size: 0.8rem;
+  font-weight: normal;
+}
+
+.unassigned-pool {
+  margin-top: 1.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px dashed #d97757;
+  border-radius: 6px;
+  background: #241c1c;
+}
+
+.unassigned-hint {
+  color: #bbb;
+  font-size: 0.85rem;
+  margin: 0.2rem 0 0.5rem 0;
+}
+
+.position-title {
+  color: #888;
+  font-size: 0.85em;
+}

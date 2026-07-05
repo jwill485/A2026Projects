@@ -1,122 +1,117 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useState } from "react";
+import { fetchCombatRoster, fetchRanks } from "./lib/api";
+import { buildRosterData } from "./lib/buildRoster";
+import { loadStoredRoster, saveRoster } from "./lib/persistence";
+import { RosterTree, UnassignedPool } from "./components/RosterTree";
+import { DragDropTree } from "./components/DragDropTree";
+import { AnalyticsTab } from "./components/AnalyticsTab";
+import type { RosterData } from "./types/roster";
+import "./App.css";
+
+type Tab = "roster" | "dragdrop" | "analytics";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [roster, setRoster] = useState<RosterData | null>(null);
+  const [rankOrder, setRankOrder] = useState<Map<string, number> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("roster");
+
+  useEffect(() => {
+    const stored = loadStoredRoster();
+    fetchRanks()
+      .then((ranksResponse) => {
+        const order = new Map(
+          ranksResponse.ranks.map((rank) => [rank.rankId, rank.rankDisplayOrder]),
+        );
+        setRankOrder(order);
+        if (stored) {
+          setRoster(stored);
+          return undefined;
+        }
+        return fetchCombatRoster().then((apiRoster) => {
+          const built = buildRosterData(apiRoster, order);
+          setRoster(built);
+          saveRoster(built);
+        });
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  }, []);
+
+  function handleChange(next: RosterData) {
+    setRoster(next);
+    saveRoster(next);
+  }
+
+  function handleRefresh() {
+    if (!rankOrder) return;
+    if (
+      !window.confirm(
+        "Refresh from the 7Cav API? This discards any manual moves you've made and rebuilds the roster from live data.",
+      )
+    ) {
+      return;
+    }
+    Promise.all([fetchCombatRoster(), fetchRanks()])
+      .then(([apiRoster, ranksResponse]) => {
+        const order = new Map(
+          ranksResponse.ranks.map((rank) => [rank.rankId, rank.rankDisplayOrder]),
+        );
+        setRankOrder(order);
+        const built = buildRosterData(apiRoster, order);
+        setRoster(built);
+        saveRoster(built);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  }
+
+  if (error) {
+    return (
+      <section id="center">
+        <p className="vacant">Failed to load roster: {error}</p>
+        <p>Is the backend running at http://localhost:8000?</p>
+      </section>
+    );
+  }
+
+  if (!roster || !rankOrder) {
+    return (
+      <section id="center">
+        <p>Loading roster…</p>
+      </section>
+    );
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+    <section id="center" style={{ alignItems: "stretch", maxWidth: "900px" }}>
+      <h1>2-7 Cavalry Battalion Roster</h1>
+      <nav className="tab-bar">
+        <button className={tab === "roster" ? "active" : ""} onClick={() => setTab("roster")}>
+          Battalion Roster
         </button>
-      </section>
+        <button className={tab === "dragdrop" ? "active" : ""} onClick={() => setTab("dragdrop")}>
+          Drag &amp; Drop
+        </button>
+        <button
+          className={tab === "analytics" ? "active" : ""}
+          onClick={() => setTab("analytics")}
+        >
+          Analytics
+        </button>
+        <button className="refresh-btn" onClick={handleRefresh}>
+          Refresh from API
+        </button>
+      </nav>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {tab === "roster" && (
+        <>
+          <RosterTree battalion={roster.battalion} />
+          <UnassignedPool group={roster.unassigned} />
+        </>
+      )}
+      {tab === "dragdrop" && <DragDropTree roster={roster} onChange={handleChange} />}
+      {tab === "analytics" && <AnalyticsTab roster={roster} />}
+    </section>
+  );
 }
 
-export default App
+export default App;

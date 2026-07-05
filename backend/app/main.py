@@ -54,3 +54,8 @@ async def get_roster(roster: str, lite: bool = True):
 @app.get("/api/awol")
 async def get_awol():
     return await _proxy_get("/milpacs/awol")
+
+
+@app.get("/api/ranks")
+async def get_ranks():
+    return await _proxy_get("/milpacs/ranks")
