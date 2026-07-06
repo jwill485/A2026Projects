@@ -25,6 +25,18 @@
   margin-bottom: 0.3rem;
 }
 
+.changelog-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+}
+
+.changelog-entry-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.changelog-toolbar button,
 .changelog-entry-header button {
   background: #2a2a2a;
   border: 1px solid #444;
@@ -35,6 +47,7 @@
   font-size: 0.8rem;
 }
 
+.changelog-toolbar button:hover,
 .changelog-entry-header button:hover {
   background: #333;
 }

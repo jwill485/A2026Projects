@@ -228,6 +228,23 @@ export function addSquad(roster: RosterData, companyLetter: string, platoonNumbe
   return clone;
 }
 
+export function addSoldierToUnassigned(roster: RosterData, soldier: Soldier): RosterData {
+  const clone = structuredClone(roster);
+  // New/imported soldiers land in a holding squad within Unassigned so they always have a home.
+  let platoon = clone.unassigned.platoons.find((p) => p.number === "0");
+  if (!platoon) {
+    platoon = { number: "0", leader: null, sergeant: null, squads: [] };
+    clone.unassigned.platoons.unshift(platoon);
+  }
+  let squad = platoon.squads.find((s) => s.number === "0");
+  if (!squad) {
+    squad = { number: "0", leader: null, members: [] };
+    platoon.squads.unshift(squad);
+  }
+  squad.members.push(soldier);
+  return clone;
+}
+
 export function addCompany(
   roster: RosterData,
   letter: string,

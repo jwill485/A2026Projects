@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { fetchCombatRoster, fetchRanks } from "./lib/api";
 import { buildRosterData } from "./lib/buildRoster";
 import { makeBlankRoster, makeSoldier } from "./lib/rosterFactory";
-import { addCompany, deleteSoldier, updateSoldier, type SoldierPatch } from "./lib/moveSoldier";
+import {
+  addCompany,
+  addSoldierToUnassigned,
+  deleteSoldier,
+  updateSoldier,
+  type SoldierPatch,
+} from "./lib/moveSoldier";
+import { collectAllSoldiers } from "./lib/analytics";
 import { diffRosters } from "./lib/changelog";
 import {
   loadStoredRoster,
@@ -11,13 +18,14 @@ import {
   saveBaseline,
   loadChangeLog,
   saveChangeLog,
+  clearChangeLog,
   type ChangeLogEntry,
 } from "./lib/persistence";
 import { RosterTree, UnassignedPool } from "./components/RosterTree";
 import { DragDropTree } from "./components/DragDropTree";
 import { AnalyticsTab } from "./components/AnalyticsTab";
 import { ChangeLogPanel } from "./components/ChangeLogPanel";
-import type { RosterData } from "./types/roster";
+import type { RosterData, Soldier } from "./types/roster";
 import type { ApiRankExpanded } from "./types/api";
 import "./App.css";
 
@@ -99,20 +107,15 @@ function App() {
   function handleAddSoldier(input: { realName: string; rankId: string; rankShort: string; rankFull: string; mos: string }) {
     if (!roster) return;
     const soldier = makeSoldier(input);
-    const next = structuredClone(roster);
-    // New soldiers land in a holding squad within Unassigned so they always have a home.
-    let platoon = next.unassigned.platoons.find((p) => p.number === "0");
-    if (!platoon) {
-      platoon = { number: "0", leader: null, sergeant: null, squads: [] };
-      next.unassigned.platoons.unshift(platoon);
-    }
-    let squad = platoon.squads.find((s) => s.number === "0");
-    if (!squad) {
-      squad = { number: "0", leader: null, members: [] };
-      platoon.squads.unshift(squad);
-    }
-    squad.members.push(soldier);
-    handleChange(next);
+    handleChange(addSoldierToUnassigned(roster, soldier));
+  }
+
+  function handleImportSoldier(soldier: Soldier): boolean {
+    if (!roster) return false;
+    const alreadyPresent = collectAllSoldiers(roster).some((s) => s.userId === soldier.userId);
+    if (alreadyPresent) return false;
+    handleChange(addSoldierToUnassigned(roster, soldier));
+    return true;
   }
 
   function handleEditSoldier(userId: string, patch: SoldierPatch) {
@@ -179,6 +182,18 @@ function App() {
     setShowChangeLog(true);
   }
 
+  function handleClearChangeLog() {
+    if (!window.confirm("Clear the entire change log? This cannot be undone.")) return;
+    setChangeLog([]);
+    clearChangeLog();
+  }
+
+  function handleDeleteChangeLogEntry(timestamp: string) {
+    const updated = changeLog.filter((entry) => entry.timestamp !== timestamp);
+    setChangeLog(updated);
+    saveChangeLog(updated);
+  }
+
   if (error) {
     return (
       <section id="center">
@@ -235,7 +250,13 @@ function App() {
         </div>
       </nav>
 
-      {showChangeLog && <ChangeLogPanel entries={changeLog} />}
+      {showChangeLog && (
+        <ChangeLogPanel
+          entries={changeLog}
+          onClearAll={handleClearChangeLog}
+          onDeleteEntry={handleDeleteChangeLogEntry}
+        />
+      )}
 
       {tab === "roster" && (
         <>
@@ -252,6 +273,7 @@ function App() {
           onAddSoldier={handleAddSoldier}
           onEditSoldier={handleEditSoldier}
           onDeleteSoldier={handleDeleteSoldier}
+          onImportSoldier={handleImportSoldier}
         />
       )}
       {tab === "analytics" && <AnalyticsTab roster={roster} />}

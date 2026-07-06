@@ -46,3 +46,7 @@ export function loadChangeLog(): ChangeLogEntry[] {
 export function saveChangeLog(entries: ChangeLogEntry[]): void {
   localStorage.setItem(CHANGELOG_KEY, JSON.stringify(entries));
 }
+
+export function clearChangeLog(): void {
+  localStorage.removeItem(CHANGELOG_KEY);
+}

@@ -1,6 +1,6 @@
 import type { Company, RosterData, Soldier } from "../types/roster";
 
-interface LocationInfo {
+export interface LocationInfo {
   label: string;
   soldier: Soldier;
 }
@@ -50,7 +50,7 @@ function describeCompany(company: Company, map: Map<string, LocationInfo>): void
   }
 }
 
-function describeSoldierLocations(roster: RosterData): Map<string, LocationInfo> {
+export function describeSoldierLocations(roster: RosterData): Map<string, LocationInfo> {
   const map = new Map<string, LocationInfo>();
   if (roster.battalion.commander)
     map.set(roster.battalion.commander.userId, {

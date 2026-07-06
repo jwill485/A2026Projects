@@ -3,7 +3,9 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-
 import type { Battalion, Company, Platoon, RosterData, Soldier, Squad } from "../types/roster";
 import type { ApiRankExpanded } from "../types/api";
 import { moveSoldier, addPlatoon, addSquad, type SlotPath, type SoldierPatch } from "../lib/moveSoldier";
+import { collectAllSoldiers } from "../lib/analytics";
 import { SoldierForm, type SoldierFormValues } from "./SoldierForm";
+import { ImportSoldierPicker } from "./ImportSoldierPicker";
 import "./RosterTree.css";
 import "./DragDropTree.css";
 
@@ -301,6 +303,7 @@ export function DragDropTree({
   onAddSoldier,
   onEditSoldier,
   onDeleteSoldier,
+  onImportSoldier,
 }: {
   roster: RosterData;
   onChange: (roster: RosterData) => void;
@@ -309,12 +312,14 @@ export function DragDropTree({
   onAddSoldier: (values: SoldierFormValues) => void;
   onEditSoldier: (userId: string, patch: SoldierPatch) => void;
   onDeleteSoldier: (userId: string) => void;
+  onImportSoldier: (soldier: Soldier) => boolean;
 }) {
   const options = paneOptions(roster);
   const [leftLetter, setLeftLetter] = useState("C");
   const [rightLetter, setRightLetter] = useState(roster.unassigned.letter);
   const [editingSoldier, setEditingSoldier] = useState<Soldier | null>(null);
   const [creatingSoldier, setCreatingSoldier] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [newCompanyLetter, setNewCompanyLetter] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
 
@@ -397,6 +402,9 @@ export function DragDropTree({
           <button className="add-btn" onClick={() => setCreatingSoldier(true)}>
             + Add Soldier
           </button>
+          <button className="add-btn" onClick={() => setImporting(true)}>
+            + Import from 2-7
+          </button>
         </div>
 
         <div className="kanban-columns">
@@ -426,6 +434,13 @@ export function DragDropTree({
             onEditSoldier(editingSoldier.userId, values);
             setEditingSoldier(null);
           }}
+        />
+      )}
+      {importing && (
+        <ImportSoldierPicker
+          existingIds={new Set(collectAllSoldiers(roster).map((s) => s.userId))}
+          onImport={onImportSoldier}
+          onClose={() => setImporting(false)}
         />
       )}
     </ActionsContext.Provider>
