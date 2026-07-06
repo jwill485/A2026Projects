@@ -2,215 +2,218 @@
 
 ## 1. Product Overview
 
-**Purpose:** A web-based roster management tool for organizing and visualizing battalion structure in the 2-7 Cavalry Regiment (or any military unit). Allows commanding officers and leadership to intuitively map, organize, and manage personnel assignments across hierarchical unit structure.
+**Purpose:** A web-based roster management tool for organizing and visualizing
+battalion structure in the 2-7 Cavalry Regiment. Lets leadership map,
+organize, and manage personnel assignments across the hierarchical unit
+structure — either live against the real 2-7 roster, or in isolated
+what-if/planning rosters (e.g. working out the upcoming battalion split)
+without touching the real data.
 
-**Primary User:** Battalion CO and subordinate leaders managing personnel assignments, roster changes, and command structure.
+**Primary User:** Battalion CO and subordinate leaders managing personnel
+assignments, roster changes, and command structure.
 
-**Key Value:** Single source of truth for battalion composition with real-time visual feedback on unit structure, vacancy tracking, and personnel assignments.
+**Key Value:** A single visual tool for both day-to-day roster maintenance
+(against the real, live 2-7 data) and structural planning (multiple
+independent named rosters, seeded from the live roster or built from
+scratch), with a full audit trail of what changed and why.
 
----
-
-## 2. Core Features
-
-### 2.1 Hierarchical Roster View
-- **Tree/Org Chart Display:** Interactive visualization showing full battalion structure
-  - Battalion level (root)
-  - Companies (Able, Baker, Charlie, Easy - expandable/collapsible)
-  - Platoons within each company (expandable/collapsible)
-  - Squads within each platoon (expandable/collapsible)
-  - Individual soldiers within squads
-
-- **Visual Indicators:**
-  - Filled positions (show soldier name, rank, role)
-  - Vacant positions (empty slot with "VACANT" label)
-  - Color coding by status (assigned, vacant, flagged for review)
-  - Position count badges (e.g., "3/4 filled")
-
-### 2.2 Soldier Management
-- **Add/Edit/Delete Soldiers:**
-  - Soldier name, rank, MOS, call sign
-  - Status (active, on leave, flagged)
-  - Notes/metadata field
-
-- **Drag-and-Drop Assignment:**
-  - Drag soldiers from an unassigned pool to open positions
-  - Move soldiers between positions
-  - Visual feedback during drag operations
-
-### 2.3 Structure Management
-- **Customize Unit Composition:**
-  - Define/edit company names and structure
-  - Set platoon count per company
-  - Set squad strength (authorized vs. actual)
-
-- **Template Presets:**
-  - Standard US Army structure templates (rifle platoons, HQ platoons, etc.)
-  - Load/save custom configurations
-
-### 2.4 Search & Filter
-- **Quick Search:** Find soldiers by name, rank, MOS, or call sign
-- **Filter:** By company, platoon, status, or vacancy status
-- **Sort:** Alphabetically, by rank, by position, etc.
-
-### 2.5 Roster Export/Report
-- **Generate Rosters:**
-  - Full battalion roster (text/PDF)
-  - Company rosters
-  - Platoon rosters
-  - Officer roster
-  - NCO roster
-
-- **Vacancy Report:** List all open positions with slot level/type
-
-### 2.6 Audit/History (Optional - Phase 2)
-- Track changes to roster (who moved where, when)
-- Version history/rollback capability
+**Status:** Built and in active use for local/personal iteration. Not yet
+deployed anywhere beyond localhost — see [§6.5](#65-deployment-status) for
+what that would take.
 
 ---
 
-## 3. Data Model
+## 2. Core Features (Built)
 
-### 3.1 Core Data Structures
+### 2.1 Multiple Named Rosters
+The app holds any number of independent rosters at once, not just one
+"current" roster. Each is fully separate: its own soldiers/structure, its own
+saved baseline, its own change log. A picker in the top bar lets you:
+- Switch between rosters instantly (no data loss — everything persists per
+  roster as you go).
+- Create a new roster (**+ New Roster**), either blank or a duplicate of the
+  currently active one.
+- Rename a roster and/or tag it with a **Configuration**: untagged, **Old**
+  (pre-split), or **New** (post-split) — see [§2.9](#29-battalion-split-support).
+- Delete a roster (blocked if it's the only one left).
 
-```
-Battalion
-├── id (UUID)
-├── name (string)
-├── companies (Company[])
-└── soldiers (Soldier[])
+The very first run auto-creates one roster ("2-7 Cavalry Battalion") from the
+live API. Anyone upgrading from an older single-roster version of the app has
+their existing data automatically migrated into a named roster on first load.
 
-Company
-├── id (UUID)
-├── name (string)
-├── designation (string, e.g., "Able Company")
-├── commander (Soldier ID or null)
-├── platoons (Platoon[])
-└── authorized_strength (int)
+### 2.2 Hierarchical Roster View
+Read-only tree view (the **Battalion Roster** tab): Battalion HQ → Companies
+→ Platoons → Squads → soldiers, expandable/collapsible, plus a separate
+Unassigned pool. Vacant billets show a **VACANT** label; each level shows a
+headcount badge.
 
-Platoon
-├── id (UUID)
-├── name (string)
-├── parent_company_id (UUID)
-├── platoon_sergeant (Soldier ID or null)
-├── squads (Squad[])
-└── authorized_strength (int)
+### 2.3 Drag-and-Drop Assignment
+The **Drag & Drop** tab shows the same tree as two side-by-side, independently
+selectable panes ("Kanban" style):
+- **Other (left)** — any company, or Unassigned.
+- **Building (right)** — same options; this is also where newly
+  added/imported soldiers land, so point it at whatever you're currently
+  populating. (You can point both panes at the same company if you just want
+  one big single-pane view.)
 
-Squad
-├── id (UUID)
-├── name (string)
-├── parent_platoon_id (UUID)
-├── squad_leader (Soldier ID or null)
-├── positions (Position[])
-└── authorized_strength (int)
+Dragging a soldier onto an occupied billet is **blocked** (no swap/bump) —
+move or remove the current occupant first. Soldiers show small ✎ (edit) and
+✕ (delete) affordances alongside their name.
 
-Position
-├── id (UUID)
-├── parent_squad_id (UUID)
-├── title (string, e.g., "Squad Member", "SAW Gunner")
-├── assigned_soldier_id (Soldier ID or null)
-├── required_rank (string or null)
-└── required_mос (string or null)
+### 2.4 Soldier Management
+Add, edit, and delete soldiers directly (name, rank — selected from the
+7Cav rank list, MOS). New soldiers land in the **Building** pane. Editing
+changes name/rank/MOS in place without moving the soldier; rank changes
+re-sort them within their squad.
 
-Soldier
-├── id (UUID)
-├── name (string)
-├── rank (string)
-├── mос (string, e.g., "11B")
-├── call_sign (string or null)
-├── status (enum: "active", "on_leave", "flagged")
-├── current_position_id (UUID or null)
-└── notes (string or null)
-```
+### 2.5 Structure Management
+Add companies (short code + name, e.g. `D` / "Dog"), platoons, and squads to
+the active roster. No delete for platoons/squads/companies — an unused empty
+one is harmless and can just be left.
 
-### 3.2 Storage
-- **Local:** Browser localStorage for quick iteration/demo
-- **Backend (Phase 2):** JSON/database backend for persistence across sessions
-- **External source:** 7Cav MILPACS API (`api.7cav.us`) as an optional import source for
-  identity/rank/position data — see [6.4](#64-external-data-source-7cav-milpacs-api)
+### 2.6 Live 7Cav API Import
+Three ways to pull real people into any roster, without ever writing back to
+the live 7Cav API:
+- **Refresh from API** — rebuilds the *active* roster from the live 2-7 data
+  (destructive to that one roster; confirmed first).
+- **+ Import Soldier** — a searchable picker of every real soldier currently
+  in 2-7 + B/ACD; adds one at a time into the Building pane.
+- **+ Import Company** — pulls a whole company (Able/Baker/Charlie/Easy, or
+  the B/ACD/Unassigned group) into the active roster in one action, platoons
+  and leadership intact. Importing the B/ACD group merges into the
+  destination roster's own Unassigned pool (every roster already has one) —
+  it never creates a second Unassigned pane. Soldiers already present
+  elsewhere in the destination roster are silently skipped rather than
+  duplicated.
+
+Every imported soldier remembers their original billet at import time (see
+§2.7) — this is separate from, and doesn't overwrite, wherever they get
+dragged to afterward.
+
+### 2.7 Change Log / Audit History
+**Save Changes** diffs the active roster against its last-saved baseline and
+appends a timestamped entry describing every move ("who moved from → to").
+For a soldier who's newly present since the baseline, the entry shows **where
+they came from** (their billet in the live roster at import time) instead of
+a bare "(new)"; manually-created soldiers (no live origin) still show "(new)".
+Each entry can be copied as text or deleted individually; the whole log can
+be cleared. **Revert Changes** discards everything since the last save.
+
+### 2.8 Analytics
+Charts (toggleable to plain data tables) for the active roster: leadership
+fill rate by company, headcount by company, MOS breakdown, and a plain-list
+vacancy report of every open leadership billet.
+
+### 2.9 Battalion Split Support
+2-7 is expected to eventually split into two battalions (working names
+**HLLV** / **HLLWW2**). Rather than a new data-model concept, this is built
+on top of Multiple Named Rosters (§2.1): the live roster stays as-is (tagged
+**Old**), and each new battalion is built out as its own separate roster
+(tagged **New**), populated by breaking down the old companies via Import
+Company/Import Soldier. The Battalion Roster tab shows a colored **"Viewing:
+Old/New Configuration"** badge based on the active roster's tag, so it's
+always clear which one is in view. See [§8.1](#81-battalion-split-2-7--two-battalions)
+for the fuller history of this decision.
 
 ---
 
-## 4. UI/UX Layout
+## 3. Data Model (Actual)
 
-### 4.1 Main Interface Layout
+```ts
+interface Soldier {
+  userId: string;        // 7Cav user id, or "local-<uuid>" for hand-created soldiers
+  username: string;      // 7Cav username; blank for hand-created soldiers
+  realName: string;
+  rankId: string;
+  rankShort: string;
+  rankFull: string;
+  positionTitle: string; // raw 7Cav position title, if imported
+  mos: string;
+  originLabel?: string;  // billet label at import time; unset if hand-created
+}
 
-```
-┌─────────────────────────────────────────────────────┐
-│  Battalion Roster Management - 2-7 Cavalry         │
-├─────────────────────────────────────────────────────┤
-│  [Search Bar] [Filter] [+ Add Soldier] [Export]   │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  UNASSIGNED SOLDIERS (Left Panel)                  │
-│  ┌──────────────────────────────────┐              │
-│  │ Total: 5 | Vacant Slots: 12      │              │
-│  ├──────────────────────────────────┤              │
-│  │ • CPL Johnson (11B)              │ <- Draggable │
-│  │ • PVT Martinez (11B)             │              │
-│  │ • SPC Taylor (68W)               │              │
-│  │ • PVT Chen (11B)                 │              │
-│  │ • CPL Brown (11B)                │              │
-│  └──────────────────────────────────┘              │
-│                                                     │
-│  BATTALION STRUCTURE (Center/Right Panel)          │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ ▼ 2-7 CAVALRY BATTALION [Authorized: 150]   │  │
-│  │   ├─ ▼ Able Company [CPL Anderson] (12/14) │  │
-│  │   │  ├─ ▼ 1st Platoon (Iron Crucible)      │  │
-│  │   │  │  ├─ ▼ 1st Squad                     │  │
-│  │   │  │  │  ├─ Squad Leader: SPC Torres    │  │
-│  │   │  │  │  ├─ [3 more positions]          │  │
-│  │   │  │  │  ├─ [VACANT]                     │  │
-│  │   │  │  └─ ▼ 2nd Squad                     │  │
-│  │   │  │     ├─ Squad Leader: CPL Brown     │  │
-│  │   │  │     ├─ [positions...]              │  │
-│  │   │  └─ ▼ 3rd Platoon                      │  │
-│  │   │     └─ [collapsed]                    │  │
-│  │   ├─ ▼ Baker Company [VACANT] (6/14)      │  │
-│  │   ├─ ▼ Charlie Company [SPC Johnson]      │  │
-│  │   │  └─ [collapsed]                       │  │
-│  │   └─ ▼ Easy Company [VACANT] (8/14)       │  │
-│  │      └─ [collapsed]                       │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
+interface Squad {
+  number: string;
+  leader: Soldier | null;
+  members: Soldier[];
+}
 
-### 4.2 Key UI Components
+interface Platoon {
+  number: string;
+  leader: Soldier | null;
+  sergeant: Soldier | null;
+  squads: Squad[];
+}
 
-**Soldier Card (Unassigned/Position):**
-```
-┌──────────────────────────┐
-│ CPL Johnson              │  <- Rank + Name
-│ 11B | Call: "Wrench"     │  <- MOS | Call Sign
-│ [Active] [Edit] [Remove] │  <- Status + Actions
-└──────────────────────────┘
+interface Company {
+  letter: string;   // short code, e.g. "A" or "UNASSIGNED" — not literally one letter
+  name: string;
+  commander: Soldier | null;
+  executiveOfficer: Soldier | null;
+  firstSergeant: Soldier | null;
+  platoons: Platoon[];
+}
+
+interface Battalion {
+  designation: string;
+  commander: Soldier | null;
+  executiveOfficer: Soldier | null;
+  sergeantMajor: Soldier | null;
+  companies: Company[];
+}
+
+interface RosterData {
+  battalion: Battalion;
+  unassigned: Company;   // the B/ACD-style holding pool; every roster has exactly one
+}
 ```
 
-**Position Slot (Vacant):**
-```
-┌──────────────────────────┐
-│ [VACANT]                 │
-│ Squad Member             │  <- Position Title
-│ Required: PFC or higher  │  <- Requirements (if any)
-│ [Drag soldier here]      │  <- Drop target
-└──────────────────────────┘
-```
-
-**Position Slot (Filled):**
-```
-┌──────────────────────────┐
-│ SPC Torres               │  <- Soldier name
-│ Squad Leader (11B)       │  <- Position title (MOS)
-│ [Edit] [Remove]          │  <- Actions (can drag to reassign)
-└──────────────────────────┘
+A roster's *identity* (name, id, Configuration tag) lives separately from its
+data, in an index entry:
+```ts
+interface RosterSummary {
+  id: string;
+  name: string;
+  updatedAt: string;
+  configuration?: "old" | "new";
+}
 ```
 
-**Stats Summary Bar:**
+### 3.1 Storage
+All client-side, in `localStorage`, namespaced per roster id:
+- `roster-manager:index` — `RosterSummary[]`
+- `roster-manager:active-id` — which roster is currently active
+- `roster-manager:roster:<id>` / `roster-manager:baseline:<id>` / `roster-manager:changelog:<id>`
+  — that roster's current data, last-saved baseline, and change log
+
+No server-side database — see [§6.5](#65-deployment-status) for what a
+multi-user/shared version would need instead.
+
+---
+
+## 4. UI/UX Layout (Actual)
+
+Top of the page, three boxed groups side by side:
+
 ```
-Able Company: 12/14 filled | Baker Company: 6/14 filled | Charlie Company: 10/15 filled | Easy Company: 8/14 filled
-Total Battalion: 36/57 filled | Vacant: 21 | On Leave: 2
+┌─────────────────┐  ┌───────────────────────────────┐  ┌───────────────────────────────────────┐
+│ [Roster ▾] [+New]│  │ [Battalion Roster] [Drag&Drop]│  │ [Refresh][Save][Revert][Change Log(N)] │
+│ [Rename][Delete] │  │ [Analytics]                   │  │                                         │
+└─────────────────┘  └───────────────────────────────┘  └─────────────────────────────────────────┘
 ```
+
+Below that, whichever tab is active:
+- **Battalion Roster** — optional Old/New badge, then the read-only tree +
+  Unassigned pool.
+- **Drag & Drop** — Battalion HQ, the Other/Building pane selectors, the
+  Add Company / Add Soldier / Import Soldier / Import Company buttons, then
+  the two Kanban panes side by side.
+- **Analytics** — the "Show as tables" toggle, then the four charts/reports.
+
+The whole app uses a fixed dark theme (`#000` background) with a gold/blue
+accent scheme matching the 7th Cavalry Regiment's own colors — chosen via
+computed WCAG contrast checks, not eyeballed, since it's a fixed (non-adaptive)
+color scheme with no light-mode variant.
 
 ---
 
@@ -218,205 +221,152 @@ Total Battalion: 36/57 filled | Vacant: 21 | On Leave: 2
 
 ### 5.1 Common Tasks
 
-**Task: Add a new soldier**
-1. Click "+ Add Soldier"
-2. Fill form: Name, Rank, MOS, Call Sign, Status
-3. Soldier appears in "Unassigned Soldiers" pool
-4. Drag to desired position OR assign via modal
+**Reorganize the real (live) roster:** Drag & Drop tab, move people around,
+Save Changes to log it (or Revert to back out first).
 
-**Task: Move a soldier between positions**
-1. Click and drag soldier from current position to new position
-2. System updates hierarchy
-3. Previous position becomes vacant
-4. Real-time stats update
+**Add a soldier:** + Add Soldier → name/rank/MOS → lands in the Building pane
+→ drag into place.
 
-**Task: Fill a vacant position**
-1. Drag unassigned soldier to [VACANT] slot
-2. Slot fills with soldier name/rank
-3. Soldier removed from unassigned pool
+**Pull in real people:** + Import Soldier (one at a time, searchable) or
++ Import Company (a whole company, or B/ACD, at once) → both land in the
+Building pane.
 
-**Task: View roster for a single company**
-1. Click "Export" → select "Company Roster"
-2. Choose company from dropdown
-3. Generate PDF/text file with all soldiers in that company
+**Build a custom/alternate roster:** + New Roster (Blank) → + Add Company to
+lay out structure → Import Soldier/Company to populate → drag into place.
 
-**Task: View organization-wide vacancy report**
-1. Click "Export" → select "Vacancy Report"
-2. See all vacant positions listed by company/platoon
-3. Filter or export as needed
+**Split the battalion:** tag the live roster **Old**, create a **New**-tagged
+roster per new battalion, Import Company to break down the old ones. The
+Battalion Roster tab's badge tracks which one is in view.
+
+**Review/undo history:** Change Log panel — Copy an entry, Delete a stray
+one, or Clear All.
 
 ---
 
-## 6. Technical Architecture
+## 6. Technical Architecture (Actual)
 
-### 6.1 Technology Stack (Recommended)
-
-- **Frontend:** React (or Vue.js)
-  - State management: React Context or Zustand for battalion/soldier data
-  - Drag-and-drop: React Beautiful DnD or dnd-kit
-  - UI components: Custom or shadcn/ui for consistency
-  - Tree rendering: Recursive components or recharts/rc-tree
-
-- **Styling:** Tailwind CSS
-- **Export:** jsPDF or Puppeteer for PDF generation
-- **Storage (Phase 1):** localStorage (JSON serialization)
-- **Storage (Phase 2):** Node.js/Express backend + PostgreSQL or MongoDB
+### 6.1 Technology Stack
+- **Frontend:** React 19 + TypeScript + Vite. No UI framework/component
+  library — hand-written components and plain CSS throughout (`App.css`,
+  per-component `.css` files).
+- **Drag-and-drop:** `@dnd-kit/core`.
+- **Charts:** hand-built (`Charts.tsx`), no charting library.
+- **Backend:** FastAPI (Python), a thin proxy that holds the 7Cav MILPACS API
+  bearer token server-side and re-exposes a few read-only endpoints
+  (`/api/roster/{roster}`, `/api/awol`, `/api/ranks`) to the frontend. CORS
+  locked to `http://localhost:5173`.
+- **Storage:** browser `localStorage` only (see §3.1) — no database.
 
 ### 6.2 Data Flow
-
 ```
-User Action (drag, edit, delete)
+User action (drag, edit, import, add company...)
     ↓
-React Event Handler
+Pure mutator in moveSoldier.ts (structuredClone + patch, returns a new RosterData)
     ↓
-Update State (Context/Store)
+handleChange() in App.tsx: setRoster(next) + saveRoster(rosterId, next)
     ↓
-Persist to localStorage
-    ↓
-Re-render Components
-    ↓
-Visual Update
+Re-render
 ```
+Save Changes / Revert Changes operate on a separate baseline snapshot
+(`loadBaseline`/`saveBaseline`), independent of the live-editing roster state
+— this is what makes the change log and revert-to-last-save behavior work.
 
-### 6.3 Key Implementation Challenges
-
-- **Drag-and-drop coordination:** Ensure position swaps, reassignments, and unassigned pool updates work seamlessly
-- **Deep nesting rendering:** Efficient re-renders for large rosters with many levels
-- **State synchronization:** Keep unassigned pool, positions, and statistics in sync
-- **Responsive design:** Support mobile and desktop views (optional: mobile-first for tablet CO usage)
+### 6.3 Key Implementation Notes
+- **Block-on-occupied drag:** dropping onto a filled billet is rejected
+  outright (no swap/bump), decided explicitly over alternatives.
+- **StrictMode-safe data loading:** the initial roster-fetch effect uses a
+  cancellation flag to avoid a double-fetch race clobbering user actions
+  taken between React 18/19 StrictMode's double effect invocation in dev.
+- **Playwright E2E quirk:** the default 720px viewport height puts
+  drag targets off-screen, causing false-negative drag failures unrelated to
+  app behavior — tests use a tall (`2000px`) viewport instead.
 
 ### 6.4 External Data Source: 7Cav MILPACS API
 
-Rather than (or in addition to) manual entry, soldier data can be imported from the
-7th Cavalry Regiment's public roster API, `https://api.7cav.us` (source/spec:
-[github.com/7Cav/api](https://github.com/7Cav/api)), so the regiment's own personnel
-records become the source of truth for identity, rank, and position.
+The live-import features (§2.6) pull from the 7th Cavalry Regiment's public
+roster API, `https://api.7cav.us` (spec: [github.com/7Cav/api](https://github.com/7Cav/api)).
 
 **Auth**
-- `Authorization: Bearer <API_KEY>` header on every request.
-- The key must live server-side (env var / secrets manager), never in frontend code
-  or the repo — it grants read access to full regiment personnel records.
-- 401s come back as **plain text** (not JSON), in two forms: header missing/malformed
-  vs. a well-formed but unrecognized key.
+- `Authorization: Bearer <API_KEY>` header, held server-side only (the
+  FastAPI backend), never in frontend code or the repo.
+- 401s come back as **plain text** (not JSON).
 
-**Key endpoints** (all under the `milpacs` tag)
+**Endpoints actually used**
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/roster/{roster}` | Full profiles (incl. records & awards) for a roster type |
-| GET | `/api/v1/roster/{roster}/lite` | Same, minus records/awards — cheaper for populating the tree view |
-| GET | `/api/v1/milpacs/awol` | Flat, regiment-wide list of AWOL members |
-| GET | `/api/v1/milpacs/profile/id/{userId}` | Single profile by numeric user id |
-| GET | `/api/v1/milpacs/profile/username/{username}` | Single profile by username |
-| GET | `/api/v1/milpacs/position/groups` | Canonical list of position groups/titles |
-| GET | `/api/v1/milpacs/ranks` | Canonical rank list (short/full name, image) |
+| GET | `/api/v1/roster/ROSTER_TYPE_COMBAT/lite` | Lite profiles for the active combat roster — this app's live-import source |
+| GET | `/api/v1/milpacs/ranks` | Canonical rank list (short/full name, display order) |
 
-`{roster}` takes a `RosterType` enum value or its numeric form:
-`ROSTER_TYPE_COMBAT`, `ROSTER_TYPE_RESERVE`, `ROSTER_TYPE_ELOA`,
-`ROSTER_TYPE_WALL_OF_HONOR`, `ROSTER_TYPE_ARLINGTON`, `ROSTER_TYPE_PAST_MEMBERS`.
-`ROSTER_TYPE_COMBAT` is the active roster relevant to this app.
-
-**Response shape** (`LiteRoster`, profiles keyed by milpac relation id):
-```
-{
-  profiles: {
-    "<relationId>": {
-      user: { userId, username } | null,
-      rank: { rankShort, rankFull, rankImageUrl, rankId } | null,
-      realName: string,
-      uniformUrl: string,
-      roster: RosterType,
-      primary: { positionTitle, positionId } | null,
-      secondaries: [{ positionTitle, positionId }],
-      joinDate, promotionDate, discordId, awardDate, recordDate,
-      lastForumPostDate, mos, consoleGamertag: string
-    }
-  }
-}
-```
-The full (non-lite) `Profile` adds `records[]` and `awards[]`.
-
-**Mapping to this app's data model**
-- `LiteProfile` → `Soldier`: `rank.rankShort`/`rankFull` → `rank`, `mos` → `mos`,
-  `user.username`/`consoleGamertag` → `call_sign`, `realName` → `name`.
-- Position/AWOL `groupName` strings encode unit as `{Company}/{Battalion}-{Regiment}`
-  (e.g. `A/2-7`). The API has no concept of this app's Company/Platoon/Squad tree —
-  it only goes down to "position" — so this app must (1) filter the regiment-wide
-  response down to battalion `2-7`, and (2) map the company letter to the local
-  nicknames (A→Able, B→Baker, C→Charlie, E→Easy). Platoon/squad structure and
-  authorized strengths remain locally defined and maintained.
-- No endpoint returns vacant positions directly; vacancies are inferred locally by
-  diffing the authorized structure against the `positionId`s the API reports as filled.
-
-**Caching & polling**
-- Responses carry `Cache-Control: max-age=600` (10 min) and `Vary: Accept-Encoding`.
-  Don't poll more often than every 10 minutes; pair with a manual "Refresh from API"
-  button for on-demand syncs.
-
-**Error handling**
-- Non-401 errors share one JSON shape: `{ code, message, details }`, with `code`
-  3 / 5 / 7 / 13 mapping to HTTP 400 / 404 / 403 / 500.
-- 401s are plain text, not JSON — handle as a separate case.
+**Mapping to this app's data model** (`buildRoster.ts`)
+- Position titles encode the hierarchy as `{Role} {Squad}/{Platoon}/{Company}/{Battalion}`
+  (e.g. `Trooper 4/2/A/2-7`), parsed via regex into Battalion HQ / Company HQ /
+  Platoon HQ / Squad roles.
+- Company letters are mapped to local nicknames: `A→Able, B→Baker, C→Charlie,
+  E→Easy` (hardcoded; see [§10](#10-open-questions--assumptions) on stability
+  of this mapping).
+- `B/ACD` positions (letter `B`, unit `ACD`) are routed to a separate
+  `Unassigned` group instead of merged into Baker — they're a genuinely
+  different population (BACD soldiers awaiting assignment), not part of
+  Baker Company.
+- Ranks are sorted using the API's own `rankDisplayOrder` field, not a
+  hardcoded rank list.
 
 **Sync strategy**
-- Treat the API as read-only source of truth for identity/rank/position; local state
-  stays authoritative for structure (platoons/squads) and app-only fields (notes,
-  flags, local leave status) until/unless a write-back endpoint exists.
-- Match imported soldiers to existing local records by `userId` first, falling back
-  to username (real names can change).
+- Read-only: nothing ever writes back to the 7Cav API.
+- Soldiers are matched/deduplicated by `userId`.
+
+### 6.5 Deployment Status
+
+Currently local-only (`localhost:5173` / `localhost:8000`), by design, while
+still iterating pre-demo. Known gaps before any real deployment: hardcoded
+localhost URLs/CORS, no TLS, no production process management, no
+auth/access control, and the localStorage-only persistence model means each
+browser has its own independent set of rosters — fine for a single-user tool,
+a real design question if this needs to be shared across multiple leaders.
 
 ---
 
 ## 7. UI/UX Principles
 
-- **Intuitive hierarchy:** Use indentation, color, and icons to show chain of command
-- **Drag-and-drop first:** Minimize form-filling; prefer direct manipulation
-- **Real-time feedback:** Numbers update instantly; no "save" button needed
-- **Clear status:** Color-code vacancies, availability, flags for quick scanning
-- **Context menu actions:** Right-click on positions/soldiers for quick actions (edit, remove, move)
-- **Undo/Redo (Phase 2):** Support quick corrections
+- **Intuitive hierarchy:** indentation + expand/collapse mirrors chain of
+  command.
+- **Drag-and-drop first:** moving people is direct manipulation, not forms.
+- **Explicit save, not silent autosave:** every edit persists to
+  `localStorage` immediately (so nothing is lost on refresh), but the
+  *change log* only records a batch when you click **Save Changes** — this
+  is a deliberate two-tier model (auto-persist vs. explicit "log this batch"),
+  not a "no save button needed" design.
+- **Block, don't bump:** drag-and-drop onto an occupied billet is rejected,
+  not swapped — explicit user choice over an alternative "bump" design.
+- **Computed, not eyeballed, contrast:** the color scheme was chosen and
+  verified via WCAG relative-luminance contrast ratios, not by eye.
+- **Read-only vs. editable views kept separate:** Battalion Roster (tree,
+  read-only) and Drag & Drop (Kanban, editable) are different tabs rather
+  than one view with an edit-mode toggle.
 
 ---
 
-## 8. Optional Phase 2 Features
+## 8. Planned / Not Yet Built
 
-- **Rank validation:** Prevent assigning E1 to squad leader roles
-- **MOS matching:** Flag positions filled by soldiers with mismatched MOS
-- **Attendance tracking:** Mark soldiers as present/absent for formations
-- **Leave management:** Toggle soldiers on/off for leave periods
-- **Notes/flags:** Highlight soldiers for review (medical, discipline, promotion)
-- **Backup rosters:** Save snapshots of roster state
-- **Multi-battalion support:** Manage multiple units in one app
-- **User authentication:** Multi-user access with role-based permissions
-- **Change log:** Audit trail of roster changes with timestamps
+### 8.1 Battalion Split (2-7 → Two Battalions)
 
-### 8.1 In Progress: Battalion Split (2-7 → Two Battalions)
-
-2-7 Cavalry is expected to eventually split into **two** battalions, each with its
-own companies. Working names so far: **HLLV** and **HLLWW2**.
+2-7 Cavalry is expected to eventually split into **two** battalions, working
+names **HLLV** and **HLLWW2**.
 
 Originally sketched as a **Group layer** above Company in the data model (a
-single roster holding multiple battalions/groups at once). Decided instead to
-build this using the already-shipped **multiple named rosters** feature
-(§8.3) rather than restructuring `RosterData`: the current live roster stays
-as-is, and each new battalion (HLLV, HLLWW2) is built out as its own separate
-named roster, populated by breaking down the old companies via **Import
-Company from 2-7** (pulls a whole company, or the B/ACD group, into the
-active roster in one action) and **Import Soldier** (which now lands imports
-in whichever pane is marked "Building" on the right side of Drag & Drop). No
-data-model change needed — every roster already has exactly one battalion,
-which is precisely what each split-off battalion is.
+single roster holding multiple battalions/groups at once). Built instead on
+top of Multiple Named Rosters (§2.1/§2.9) rather than restructuring
+`RosterData` — no data-model change needed, since every roster already has
+exactly one battalion, which is precisely what each split-off battalion is.
+The supporting tooling (tagging, badge, whole-company import) is done; the
+actual reorg work (deciding and dragging who goes where) is ongoing,
+separate work using that tooling.
 
-To tell them apart at a glance, each `RosterSummary` can carry an optional
-`configuration: "old" | "new"` tag (set via the New Roster / Rename modals in
-`RosterPicker`), and the Battalion Roster tab shows a colored **"Viewing: Old
-Configuration" / "Viewing: New Configuration"** badge based on the active
-roster's tag. Untagged rosters show no badge.
+Built on a separate git branch (`battalion-split`), per the original decision
+to keep `master` stable while this was worked out.
 
-Building this on a separate git branch (`battalion-split`), per the original
-decision to keep `master` stable while this is worked out.
-
-### 8.2 Planned: Org Chart View
+### 8.2 Org Chart View
 
 A visual box-and-connector org chart (Battalion → Company → Platoon → Squad),
 as an alternative to the current text-tree view. Scoped to **read-only,
@@ -426,66 +376,75 @@ custom roster mid-build. Leaning toward a hand-built CSS/SVG tree layout
 (consistent with the hand-built `Charts.tsx`, no new charting dependency)
 rather than pulling in a diagramming library. Not yet started.
 
-### 8.3 Done: Multiple Named Rosters
+### 8.3 End-State Architecture Sketch
 
-Users can configure and save several distinct rosters under their own names
-and switch between them, instead of the app having exactly one "current"
-roster. `persistence.ts` namespaces roster/baseline/change-log by a generated
-roster id (`roster-manager:roster:<id>` etc.) plus a small index
-(`roster-manager:index`) and active-id pointer; a one-time
-`migrateLegacyStorage()` wraps any pre-existing single-roster data into the
-first named entry ("2-7 Cavalry Battalion") so nothing already saved locally
-is lost. A `RosterPicker` component in the top bar (left of the tab box)
-provides the roster `<select>` plus **+ New Roster** (blank or duplicate the
-active roster), **Rename**, and **Delete** (disabled when only one roster
-remains). The old destructive "Start Blank Roster" button was removed in
-favor of the non-destructive "+ New Roster" flow. Drag & Drop, the change
-log, and analytics needed no changes — they already operate generically on
-whichever `RosterData` is active.
+Once the org chart view (§8.2) lands and the battalion split reorg work
+(§8.1) settles, produce a single architecture diagram summarizing the
+finished system. Deferred until then so it reflects the real finished shape
+rather than a moving target.
+
+### 8.4 Other Not-Yet-Built Ideas
+
+- **Search & filter:** find soldiers by name/rank/MOS; filter the tree by
+  company/vacancy status.
+- **Export/report:** generate a text/PDF roster (full battalion, per-company,
+  officer/NCO-only). Today the only "export" is copying a Change Log entry
+  as text.
+- **Rank/MOS validation:** flag rank-inappropriate or MOS-mismatched billet
+  assignments.
+- **Attendance/leave tracking:** present/absent for formations, leave toggles.
+- **Notes/flags:** per-soldier notes (medical, discipline, promotion review).
+- **Multi-user auth:** role-based access if this ever needs to be shared
+  rather than run locally by one person (see §6.5).
+- **Consistency question:** **+ Add Soldier** still always lands in
+  Unassigned, while **+ Import Soldier** lands in the Building pane (per
+  §2.3/§2.6) — worth revisiting whether Add Soldier should match Import
+  Soldier's targeting for consistency.
 
 ---
 
 ## 9. Success Metrics
 
 - **Ease of use:** New user can assign all soldiers to positions in < 5 minutes
-- **Speed:** Roster changes reflected and exported in < 30 seconds
+- **Speed:** Roster changes reflected in the UI and change log instantly
 - **Accuracy:** No data loss or inconsistencies during drag-and-drop operations
-- **Flexibility:** Supports custom unit structures (non-standard company sizes, unique platoon arrangements)
+- **Flexibility:** Supports custom unit structures and parallel what-if rosters
 
 ---
 
 ## 10. Open Questions / Assumptions
 
-1. **Data persistence:** Should rosters be saved automatically to cloud, or only locally?
-2. **Multi-user:** Will multiple leaders access the same roster simultaneously (real-time sync needed)?
-3. **Rank structure:** Should we hard-code US Army rank structure, or allow customization for milsim variations? *(Partially resolved: the MILPACS API supplies rank name/image per profile for combat-roster members, but this app still needs its own rank list for soldiers entered manually.)*
-4. **Export formats:** Priority on PDF, text, or spreadsheet export?
-5. **Mobile support:** Essential for tablet access in the field, or desktop-only initially?
-6. **Learning/alternate structures:** Does 2-7 use non-standard unit organization (e.g., extra platoons, different squad sizes)?
-7. **API key hosting:** This app needs a backend/proxy layer to hold the MILPACS API bearer token server-side — is a Phase 1 backend in scope, or does Phase 1 stay client-only and defer the live API import to Phase 2?
-8. **Company-letter mapping stability:** Is the `A/B/C/E → Able/Baker/Charlie/Easy` mapping fixed, or could 2-7's lettering change (e.g. a Delta company added later)?
+1. **Multi-user:** Will multiple leaders ever need to access/edit the same
+   roster simultaneously? Today it's strictly single-user/single-browser
+   (localStorage only) — see §6.5.
+2. **Rank structure:** *(Resolved)* The MILPACS API supplies rank
+   name/display-order per profile for combat-roster members; the app also
+   keeps its own rank list (fetched from the API) for hand-created soldiers.
+3. **API key hosting:** *(Resolved)* A FastAPI backend proxy holds the key
+   server-side; the frontend never sees it.
+4. **Company-letter mapping stability:** Is the `A/B/C/E → Able/Baker/Charlie/Easy`
+   mapping fixed, or could 2-7's lettering change (e.g. a Delta company added
+   later)? Still hardcoded in `buildRoster.ts`; relevant to how the eventual
+   battalion split (§8.1) names its own companies.
+5. **Export formats:** If export/report (§8.4) gets built, priority on PDF,
+   text, or spreadsheet?
+6. **Mobile support:** Desktop-only today; not evaluated for tablet/phone use.
 
 ---
 
 ## 11. Getting Started for Development
 
-1. **Create React app** with Vite or CRA
-2. **Design data model** in TypeScript (define types for Battalion, Company, Soldier, etc.)
-3. **Build core UI skeleton** (unassigned pool + expandable tree)
-4. **Implement drag-and-drop** (start with simple drag-to-position assignment)
-5. **Add CRUD operations** (add/edit/delete soldiers, modify structure)
-6. **Implement export** (generate text/PDF rosters)
-7. **Polish and refactor** (undo/redo, error handling, responsive design)
+See [`HOW_TO_USE.md`](HOW_TO_USE.md) for exact setup commands (backend venv +
+FastAPI, frontend `npm install`/`npm run dev`) and a full feature walkthrough.
 
-### 11.1 Planned: End-State Architecture Sketch
-
-Once the app reaches a feature-complete/final version (org chart view, named
-multi-roster support, etc. all landed), produce a single architecture diagram
-summarizing the finished system: frontend (React/Vite) ↔ backend proxy
-(FastAPI) ↔ 7Cav MILPACS API, plus the client-side persistence/data-flow layer
-(localStorage-backed roster/baseline/change-log, the move engine, and the
-active-roster picker once built). Deferred until the shape of the finished
-system is settled, rather than sketched against a moving target now.
+Repo layout:
+- `backend/app/main.py` — the FastAPI proxy (three read-only endpoints).
+- `frontend/src/lib/` — pure data logic: `buildRoster.ts` (live-API → 
+  `RosterData`), `moveSoldier.ts` (all mutations), `persistence.ts`
+  (localStorage), `changelog.ts`, `analytics.ts`.
+- `frontend/src/components/` — UI: `RosterTree`/`DragDropTree` (the two
+  roster views), `RosterPicker`, `SoldierForm`, `ImportSoldierPicker`/
+  `ImportCompanyPicker`, `AnalyticsTab`, `ChangeLogPanel`.
 
 ---
 
@@ -517,17 +476,14 @@ system is settled, rather than sketched against a moving target now.
 
 ---
 
-## Appendix B: Sample Soldier Data (for testing/demo)
+## Appendix B: Sample Soldier Data (matches the actual `Soldier` shape)
 
-```
+```ts
 [
-  { name: "Torres", rank: "SPC", mос: "11B", callSign: "Tiger", status: "active" },
-  { name: "Anderson", rank: "CPL", mос: "11B", callSign: "Ghost", status: "active" },
-  { name: "Brown", rank: "CPL", mос: "11B", callSign: "Wrench", status: "active" },
-  { name: "Johnson", rank: "SPC", mос: "11B", callSign: "Recon", status: "active" },
-  { name: "Martinez", rank: "CPT", mос: "11A", callSign: null, status: "active" },
-  { name: "Chen", rank: "PVT", mос: "11B", callSign: "Echo", status: "on_leave" },
-  { name: "Davis", rank: "CPL", mос: "11B", callSign: "Hammer", status: "active" },
-  { name: "Williams", rank: "PFC", mос: "11B", callSign: null, status: "active" }
+  { userId: "1001", username: "Torres.S", realName: "Torres", rankId: "r4", rankShort: "SPC", rankFull: "Specialist", positionTitle: "Squad Leader 1/1/A/2-7", mos: "11B" },
+  { userId: "1002", username: "Anderson.C", realName: "Anderson", rankId: "r3", rankShort: "CPL", rankFull: "Corporal", positionTitle: "Trooper 1/1/A/2-7", mos: "11B" },
+  { userId: "local-9f2c...", username: "", realName: "Chen", rankId: "r1", rankShort: "PVT", rankFull: "Private", positionTitle: "", mos: "11B" }
 ]
 ```
+The third entry is a hand-created soldier (`local-` prefixed id, blank
+`username`/`positionTitle`) rather than one imported from the live API.
