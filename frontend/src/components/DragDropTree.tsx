@@ -6,6 +6,7 @@ import { moveSoldier, addPlatoon, addSquad, type SlotPath, type SoldierPatch } f
 import { collectAllSoldiers } from "../lib/analytics";
 import { SoldierForm, type SoldierFormValues } from "./SoldierForm";
 import { ImportSoldierPicker } from "./ImportSoldierPicker";
+import { ImportCompanyPicker } from "./ImportCompanyPicker";
 import "./RosterTree.css";
 import "./DragDropTree.css";
 
@@ -305,6 +306,7 @@ export function DragDropTree({
   onEditSoldier,
   onDeleteSoldier,
   onImportSoldier,
+  onImportCompany,
 }: {
   roster: RosterData;
   rosterId: string;
@@ -314,7 +316,8 @@ export function DragDropTree({
   onAddSoldier: (values: SoldierFormValues) => void;
   onEditSoldier: (userId: string, patch: SoldierPatch) => void;
   onDeleteSoldier: (userId: string) => void;
-  onImportSoldier: (soldier: Soldier) => boolean;
+  onImportSoldier: (soldier: Soldier, targetLetter: string) => boolean;
+  onImportCompany: (company: Company) => boolean;
 }) {
   const options = paneOptions(roster);
   const [leftLetter, setLeftLetter] = useState(
@@ -324,6 +327,7 @@ export function DragDropTree({
   const [editingSoldier, setEditingSoldier] = useState<Soldier | null>(null);
   const [creatingSoldier, setCreatingSoldier] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importingCompany, setImportingCompany] = useState(false);
   const [newCompanyLetter, setNewCompanyLetter] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
 
@@ -385,7 +389,7 @@ export function DragDropTree({
         <div className="kanban-toolbar">
           <div className="kanban-selectors">
             <label>
-              Left pane:{" "}
+              Other (left):{" "}
               <select value={leftLetter} onChange={(e) => setLeftLetter(e.target.value)}>
                 {options.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -395,7 +399,7 @@ export function DragDropTree({
               </select>
             </label>
             <label>
-              Right pane:{" "}
+              Building (right — new soldiers land here):{" "}
               <select value={rightLetter} onChange={(e) => setRightLetter(e.target.value)}>
                 {options.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -427,7 +431,10 @@ export function DragDropTree({
             + Add Soldier
           </button>
           <button className="add-btn" onClick={() => setImporting(true)}>
-            + Import from 2-7
+            + Import Soldier
+          </button>
+          <button className="add-btn" onClick={() => setImportingCompany(true)}>
+            + Import Company
           </button>
         </div>
 
@@ -463,8 +470,15 @@ export function DragDropTree({
       {importing && (
         <ImportSoldierPicker
           existingIds={new Set(collectAllSoldiers(roster).map((s) => s.userId))}
-          onImport={onImportSoldier}
+          onImport={(soldier) => onImportSoldier(soldier, rightLetter)}
           onClose={() => setImporting(false)}
+        />
+      )}
+      {importingCompany && (
+        <ImportCompanyPicker
+          existingLetters={new Set([...roster.battalion.companies.map((c) => c.letter), roster.unassigned.letter])}
+          onImport={onImportCompany}
+          onClose={() => setImportingCompany(false)}
         />
       )}
     </ActionsContext.Provider>

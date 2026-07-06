@@ -4,8 +4,10 @@ import { buildRosterData } from "./lib/buildRoster";
 import { makeBlankRoster, makeSoldier } from "./lib/rosterFactory";
 import {
   addCompany,
+  addSoldierToCompany,
   addSoldierToUnassigned,
   deleteSoldier,
+  importCompany,
   updateSoldier,
   type SoldierPatch,
 } from "./lib/moveSoldier";
@@ -35,7 +37,7 @@ import { DragDropTree } from "./components/DragDropTree";
 import { AnalyticsTab } from "./components/AnalyticsTab";
 import { ChangeLogPanel } from "./components/ChangeLogPanel";
 import { RosterPicker } from "./components/RosterPicker";
-import type { RosterData, Soldier } from "./types/roster";
+import type { Company, RosterData, Soldier } from "./types/roster";
 import type { ApiRankExpanded } from "./types/api";
 import "./App.css";
 
@@ -140,12 +142,19 @@ function App() {
     handleChange(addSoldierToUnassigned(roster, soldier));
   }
 
-  function handleImportSoldier(soldier: Soldier): boolean {
+  function handleImportSoldier(soldier: Soldier, targetLetter: string): boolean {
     if (!roster) return false;
     const alreadyPresent = collectAllSoldiers(roster).some((s) => s.userId === soldier.userId);
     if (alreadyPresent) return false;
-    handleChange(addSoldierToUnassigned(roster, soldier));
+    handleChange(addSoldierToCompany(roster, targetLetter, soldier));
     return true;
+  }
+
+  function handleImportCompany(company: Company): boolean {
+    if (!roster) return false;
+    const result = importCompany(roster, company);
+    if (result.ok) handleChange(result.roster);
+    return result.ok;
   }
 
   function handleEditSoldier(userId: string, patch: SoldierPatch) {
@@ -314,6 +323,7 @@ function App() {
           onEditSoldier={handleEditSoldier}
           onDeleteSoldier={handleDeleteSoldier}
           onImportSoldier={handleImportSoldier}
+          onImportCompany={handleImportCompany}
         />
       )}
       {tab === "analytics" && <AnalyticsTab roster={roster} />}

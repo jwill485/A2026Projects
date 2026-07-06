@@ -7,6 +7,8 @@ export interface Soldier {
   rankFull: string;
   positionTitle: string;
   mos: string;
+  // Billet label at time of import from the live roster; unset for manually-created soldiers.
+  originLabel?: string;
 }
 
 export interface Squad {

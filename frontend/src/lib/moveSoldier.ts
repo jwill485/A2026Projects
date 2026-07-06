@@ -1,5 +1,6 @@
 import type { Company, Platoon, RosterData, Soldier } from "../types/roster";
 import { makeCompany } from "./rosterFactory";
+import { collectAllSoldiers } from "./analytics";
 
 export type SlotPath =
   | { kind: "battalionCommander" }
@@ -228,13 +229,15 @@ export function addSquad(roster: RosterData, companyLetter: string, platoonNumbe
   return clone;
 }
 
-export function addSoldierToUnassigned(roster: RosterData, soldier: Soldier): RosterData {
+export function addSoldierToCompany(roster: RosterData, letter: string, soldier: Soldier): RosterData {
   const clone = structuredClone(roster);
-  // New/imported soldiers land in a holding squad within Unassigned so they always have a home.
-  let platoon = clone.unassigned.platoons.find((p) => p.number === "0");
+  const company = findCompany(clone, letter) ?? clone.unassigned;
+  // New/imported soldiers land in a holding squad so they always have a home
+  // even in a company with no platoons/squads built out yet.
+  let platoon = company.platoons.find((p) => p.number === "0");
   if (!platoon) {
     platoon = { number: "0", leader: null, sergeant: null, squads: [] };
-    clone.unassigned.platoons.unshift(platoon);
+    company.platoons.unshift(platoon);
   }
   let squad = platoon.squads.find((s) => s.number === "0");
   if (!squad) {
@@ -245,6 +248,10 @@ export function addSoldierToUnassigned(roster: RosterData, soldier: Soldier): Ro
   return clone;
 }
 
+export function addSoldierToUnassigned(roster: RosterData, soldier: Soldier): RosterData {
+  return addSoldierToCompany(roster, roster.unassigned.letter, soldier);
+}
+
 export function addCompany(
   roster: RosterData,
   letter: string,
@@ -253,6 +260,66 @@ export function addCompany(
   if (findCompany(roster, letter)) return { roster, ok: false };
   const clone = structuredClone(roster);
   clone.battalion.companies.push(makeCompany(letter, name));
+  return { roster: clone, ok: true };
+}
+
+function pruneDuplicates(company: Company, existingIds: Set<string>): void {
+  if (company.commander && existingIds.has(company.commander.userId)) company.commander = null;
+  if (company.executiveOfficer && existingIds.has(company.executiveOfficer.userId))
+    company.executiveOfficer = null;
+  if (company.firstSergeant && existingIds.has(company.firstSergeant.userId))
+    company.firstSergeant = null;
+  for (const platoon of company.platoons) {
+    if (platoon.leader && existingIds.has(platoon.leader.userId)) platoon.leader = null;
+    if (platoon.sergeant && existingIds.has(platoon.sergeant.userId)) platoon.sergeant = null;
+    for (const squad of platoon.squads) {
+      if (squad.leader && existingIds.has(squad.leader.userId)) squad.leader = null;
+      squad.members = squad.members.filter((m) => !existingIds.has(m.userId));
+    }
+  }
+}
+
+function isPlatoonEmpty(platoon: Platoon): boolean {
+  return (
+    !platoon.leader &&
+    !platoon.sergeant &&
+    platoon.squads.every((s) => !s.leader && s.members.length === 0)
+  );
+}
+
+export function importCompany(
+  roster: RosterData,
+  company: Company,
+): { roster: RosterData; ok: boolean } {
+  const existingIds = new Set(collectAllSoldiers(roster).map((s) => s.userId));
+  const importedCompany = structuredClone(company);
+  pruneDuplicates(importedCompany, existingIds);
+  const clone = structuredClone(roster);
+
+  // The live B/ACD group shares the same "UNASSIGNED" letter every roster's
+  // own Unassigned pool already uses, so it can't be pushed in as a distinct
+  // company (the uniqueness check below would always reject it) — instead
+  // merge its platoons into the destination's existing Unassigned pool.
+  // Platoons left fully empty after de-duplication (e.g. re-importing after
+  // everyone in them is already present) are dropped rather than piling up
+  // as junk shells.
+  if (company.letter === clone.unassigned.letter) {
+    if (!clone.unassigned.commander && importedCompany.commander) {
+      clone.unassigned.commander = importedCompany.commander;
+    }
+    if (!clone.unassigned.executiveOfficer && importedCompany.executiveOfficer) {
+      clone.unassigned.executiveOfficer = importedCompany.executiveOfficer;
+    }
+    if (!clone.unassigned.firstSergeant && importedCompany.firstSergeant) {
+      clone.unassigned.firstSergeant = importedCompany.firstSergeant;
+    }
+    const newPlatoons = importedCompany.platoons.filter((p) => !isPlatoonEmpty(p));
+    clone.unassigned.platoons.push(...newPlatoons);
+    return { roster: clone, ok: true };
+  }
+
+  if (findCompany(roster, company.letter)) return { roster, ok: false };
+  clone.battalion.companies.push(importedCompany);
   return { roster: clone, ok: true };
 }
 

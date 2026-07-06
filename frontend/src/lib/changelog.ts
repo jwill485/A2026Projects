@@ -89,7 +89,12 @@ export function diffRosters(baseline: RosterData, current: RosterData): string[]
     if (b && a && b.label !== a.label) {
       lines.push(`${soldierLabel(a.soldier)}: ${b.label} → ${a.label}`);
     } else if (!b && a) {
-      lines.push(`${soldierLabel(a.soldier)}: (new) → ${a.label}`);
+      const origin = a.soldier.originLabel;
+      lines.push(
+        origin
+          ? `${soldierLabel(a.soldier)}: from ${origin} → ${a.label}`
+          : `${soldierLabel(a.soldier)}: (new) → ${a.label}`,
+      );
     } else if (b && !a) {
       lines.push(`${soldierLabel(b.soldier)}: ${b.label} → (removed from roster)`);
     }

@@ -57,8 +57,8 @@ export function ImportSoldierPicker({
       );
     }) ?? [];
 
-  function handleAdd(soldier: Soldier) {
-    const added = onImport(soldier);
+  function handleAdd(soldier: Soldier, unit: string) {
+    const added = onImport({ ...soldier, originLabel: unit });
     if (added) setAddedIds((prev) => new Set(prev).add(soldier.userId));
   }
 
@@ -86,7 +86,7 @@ export function ImportSoldierPicker({
                     {soldier.username && <span className="soldier-username"> ({soldier.username})</span>}
                   </span>
                   <span className="import-unit">{unit}</span>
-                  <button disabled={isAdded} onClick={() => handleAdd(soldier)}>
+                  <button disabled={isAdded} onClick={() => handleAdd(soldier, unit)}>
                     {isAdded ? "Added" : "Add"}
                   </button>
                 </li>
