@@ -407,6 +407,33 @@ separate git branch** when the split becomes active work, rather than
 restructuring the data model on `master` speculatively — keeps `master` stable
 if the branch needs to be reworked or abandoned.
 
+### 8.2 Planned: Org Chart View
+
+A visual box-and-connector org chart (Battalion → Company → Platoon → Squad),
+as an alternative to the current text-tree view. Scoped to **read-only,
+finished rosters only** — generated for the live Battalion Roster tab, or for
+a custom roster once it's considered "complete," not for a blank/in-progress
+custom roster mid-build. Leaning toward a hand-built CSS/SVG tree layout
+(consistent with the hand-built `Charts.tsx`, no new charting dependency)
+rather than pulling in a diagramming library. Not yet started.
+
+### 8.3 Done: Multiple Named Rosters
+
+Users can configure and save several distinct rosters under their own names
+and switch between them, instead of the app having exactly one "current"
+roster. `persistence.ts` namespaces roster/baseline/change-log by a generated
+roster id (`roster-manager:roster:<id>` etc.) plus a small index
+(`roster-manager:index`) and active-id pointer; a one-time
+`migrateLegacyStorage()` wraps any pre-existing single-roster data into the
+first named entry ("2-7 Cavalry Battalion") so nothing already saved locally
+is lost. A `RosterPicker` component in the top bar (left of the tab box)
+provides the roster `<select>` plus **+ New Roster** (blank or duplicate the
+active roster), **Rename**, and **Delete** (disabled when only one roster
+remains). The old destructive "Start Blank Roster" button was removed in
+favor of the non-destructive "+ New Roster" flow. Drag & Drop, the change
+log, and analytics needed no changes — they already operate generically on
+whichever `RosterData` is active.
+
 ---
 
 ## 9. Success Metrics
@@ -440,6 +467,16 @@ if the branch needs to be reworked or abandoned.
 5. **Add CRUD operations** (add/edit/delete soldiers, modify structure)
 6. **Implement export** (generate text/PDF rosters)
 7. **Polish and refactor** (undo/redo, error handling, responsive design)
+
+### 11.1 Planned: End-State Architecture Sketch
+
+Once the app reaches a feature-complete/final version (org chart view, named
+multi-roster support, etc. all landed), produce a single architecture diagram
+summarizing the finished system: frontend (React/Vite) ↔ backend proxy
+(FastAPI) ↔ 7Cav MILPACS API, plus the client-side persistence/data-flow layer
+(localStorage-backed roster/baseline/change-log, the move engine, and the
+active-roster picker once built). Deferred until the shape of the finished
+system is settled, rather than sketched against a moving target now.
 
 ---
 

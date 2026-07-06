@@ -12,19 +12,29 @@ import {
 import { collectAllSoldiers } from "./lib/analytics";
 import { diffRosters } from "./lib/changelog";
 import {
-  loadStoredRoster,
+  listRosters,
+  getActiveRosterId,
+  setActiveRosterId,
+  loadRoster,
   saveRoster,
   loadBaseline,
   saveBaseline,
   loadChangeLog,
   saveChangeLog,
   clearChangeLog,
+  touchRoster,
+  createRoster,
+  renameRoster,
+  deleteRoster,
+  migrateLegacyStorage,
   type ChangeLogEntry,
+  type RosterSummary,
 } from "./lib/persistence";
 import { RosterTree, UnassignedPool } from "./components/RosterTree";
 import { DragDropTree } from "./components/DragDropTree";
 import { AnalyticsTab } from "./components/AnalyticsTab";
 import { ChangeLogPanel } from "./components/ChangeLogPanel";
+import { RosterPicker } from "./components/RosterPicker";
 import type { RosterData, Soldier } from "./types/roster";
 import type { ApiRankExpanded } from "./types/api";
 import "./App.css";
@@ -32,6 +42,8 @@ import "./App.css";
 type Tab = "roster" | "dragdrop" | "analytics";
 
 function App() {
+  const [rosterId, setRosterId] = useState<string | null>(null);
+  const [rosterList, setRosterList] = useState<RosterSummary[]>([]);
   const [roster, setRoster] = useState<RosterData | null>(null);
   const [baseline, setBaseline] = useState<RosterData | null>(null);
   const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([]);
@@ -41,10 +53,19 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("roster");
 
+  function activateRoster(id: string) {
+    setRosterId(id);
+    const loadedRoster = loadRoster(id);
+    setRoster(loadedRoster);
+    setBaseline(loadBaseline(id) ?? loadedRoster);
+    setChangeLog(loadChangeLog(id));
+    setActiveRosterId(id);
+  }
+
   useEffect(() => {
     let cancelled = false;
-    const stored = loadStoredRoster();
-    setChangeLog(loadChangeLog());
+    migrateLegacyStorage();
+    const existing = listRosters();
     fetchRanks()
       .then((ranksResponse) => {
         if (cancelled) return undefined;
@@ -53,20 +74,18 @@ function App() {
         );
         setRankOrder(order);
         setRanks(ranksResponse.ranks);
-        if (stored) {
-          setRoster(stored);
-          const storedBaseline = loadBaseline() ?? stored;
-          setBaseline(storedBaseline);
-          saveBaseline(storedBaseline);
+        if (existing.length > 0) {
+          setRosterList(existing);
+          const activeId = getActiveRosterId();
+          activateRoster(existing.some((r) => r.id === activeId) ? activeId! : existing[0].id);
           return undefined;
         }
         return fetchCombatRoster().then((apiRoster) => {
           if (cancelled) return;
           const built = buildRosterData(apiRoster, order);
-          setRoster(built);
-          saveRoster(built);
-          setBaseline(built);
-          saveBaseline(built);
+          const id = createRoster("2-7 Cavalry Battalion", built);
+          setRosterList(listRosters());
+          activateRoster(id);
         });
       })
       .catch((err) => {
@@ -78,23 +97,34 @@ function App() {
   }, []);
 
   function handleChange(next: RosterData) {
+    if (!rosterId) return;
     setRoster(next);
-    saveRoster(next);
+    saveRoster(rosterId, next);
   }
 
-  function handleStartBlank() {
-    if (
-      !window.confirm(
-        "Start a blank roster? This replaces the current roster entirely — save or export anything you need first.",
-      )
-    ) {
-      return;
-    }
-    const blank = makeBlankRoster();
-    setRoster(blank);
-    saveRoster(blank);
-    setBaseline(blank);
-    saveBaseline(blank);
+  function handleSwitchRoster(id: string) {
+    activateRoster(id);
+  }
+
+  function handleCreateRoster(name: string, mode: "blank" | "duplicate") {
+    const starting = mode === "duplicate" && roster ? structuredClone(roster) : makeBlankRoster();
+    const id = createRoster(name, starting);
+    setRosterList(listRosters());
+    activateRoster(id);
+  }
+
+  function handleRenameRoster(id: string, name: string) {
+    renameRoster(id, name);
+    setRosterList(listRosters());
+  }
+
+  function handleDeleteRoster(id: string) {
+    if (rosterList.length <= 1) return;
+    if (!window.confirm("Delete this roster? This cannot be undone.")) return;
+    const remaining = rosterList.filter((r) => r.id !== id);
+    deleteRoster(id);
+    setRosterList(remaining);
+    if (id === rosterId) activateRoster(remaining[0].id);
   }
 
   function handleAddCompany(letter: string, name: string): boolean {
@@ -130,7 +160,7 @@ function App() {
   }
 
   function handleRefresh() {
-    if (!rankOrder) return;
+    if (!rankOrder || !rosterId) return;
     if (
       !window.confirm(
         "Refresh from the 7Cav API? This discards any manual moves you've made and rebuilds the roster from live data.",
@@ -146,15 +176,15 @@ function App() {
         setRankOrder(order);
         const built = buildRosterData(apiRoster, order);
         setRoster(built);
-        saveRoster(built);
+        saveRoster(rosterId, built);
         setBaseline(built);
-        saveBaseline(built);
+        saveBaseline(rosterId, built);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }
 
   function handleRevert() {
-    if (!baseline) return;
+    if (!baseline || !rosterId) return;
     if (
       !window.confirm(
         "Revert all changes since the last save? This discards moves you haven't saved yet.",
@@ -163,11 +193,11 @@ function App() {
       return;
     }
     setRoster(baseline);
-    saveRoster(baseline);
+    saveRoster(rosterId, baseline);
   }
 
   function handleSave() {
-    if (!roster || !baseline) return;
+    if (!roster || !baseline || !rosterId) return;
     const changes = diffRosters(baseline, roster);
     if (changes.length === 0) {
       window.alert("No changes since the last save.");
@@ -176,22 +206,26 @@ function App() {
     const entry: ChangeLogEntry = { timestamp: new Date().toISOString(), changes };
     const updatedLog = [entry, ...changeLog];
     setChangeLog(updatedLog);
-    saveChangeLog(updatedLog);
+    saveChangeLog(rosterId, updatedLog);
     setBaseline(roster);
-    saveBaseline(roster);
+    saveBaseline(rosterId, roster);
+    touchRoster(rosterId);
+    setRosterList(listRosters());
     setShowChangeLog(true);
   }
 
   function handleClearChangeLog() {
+    if (!rosterId) return;
     if (!window.confirm("Clear the entire change log? This cannot be undone.")) return;
     setChangeLog([]);
-    clearChangeLog();
+    clearChangeLog(rosterId);
   }
 
   function handleDeleteChangeLogEntry(timestamp: string) {
+    if (!rosterId) return;
     const updated = changeLog.filter((entry) => entry.timestamp !== timestamp);
     setChangeLog(updated);
-    saveChangeLog(updated);
+    saveChangeLog(rosterId, updated);
   }
 
   if (error) {
@@ -203,7 +237,7 @@ function App() {
     );
   }
 
-  if (!roster || !rankOrder || !baseline || !ranks) {
+  if (!roster || !rankOrder || !baseline || !ranks || !rosterId) {
     return (
       <section id="center">
         <p>Loading roster…</p>
@@ -217,6 +251,14 @@ function App() {
     <section id="center" style={{ alignItems: "stretch", maxWidth: "900px" }}>
       <h1>2-7 Cavalry Battalion Roster</h1>
       <nav className="tab-bar">
+        <RosterPicker
+          rosterList={rosterList}
+          activeRosterId={rosterId}
+          onSwitch={handleSwitchRoster}
+          onCreate={handleCreateRoster}
+          onRename={handleRenameRoster}
+          onDelete={handleDeleteRoster}
+        />
         <div className="tab-group">
           <button className={tab === "roster" ? "active" : ""} onClick={() => setTab("roster")}>
             Battalion Roster
@@ -234,9 +276,6 @@ function App() {
         <div className="action-group">
           <button className="refresh-btn" onClick={handleRefresh}>
             Refresh from API
-          </button>
-          <button className="blank-btn" onClick={handleStartBlank}>
-            Start Blank Roster
           </button>
           <button onClick={handleSave} disabled={pendingChanges === 0}>
             Save Changes{pendingChanges > 0 ? ` (${pendingChanges})` : ""}

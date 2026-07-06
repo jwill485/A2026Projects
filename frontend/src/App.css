@@ -8,14 +8,25 @@
 }
 
 .tab-group,
-.action-group {
+.action-group,
+.roster-group {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
   background: #1a1a19;
   border: 1px solid #333;
   border-radius: 8px;
+}
+
+.roster-group select {
+  background: #222;
+  color: #eee;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
 }
 
 .tab-bar button {
