@@ -72,6 +72,12 @@ function describeSoldierLocations(roster: RosterData): Map<string, LocationInfo>
   return map;
 }
 
+function soldierLabel(soldier: Soldier): string {
+  return soldier.username
+    ? `${soldier.rankShort} ${soldier.realName} (${soldier.username})`
+    : `${soldier.rankShort} ${soldier.realName}`;
+}
+
 export function diffRosters(baseline: RosterData, current: RosterData): string[] {
   const before = describeSoldierLocations(baseline);
   const after = describeSoldierLocations(current);
@@ -81,11 +87,11 @@ export function diffRosters(baseline: RosterData, current: RosterData): string[]
     const b = before.get(id);
     const a = after.get(id);
     if (b && a && b.label !== a.label) {
-      lines.push(`${a.soldier.rankShort} ${a.soldier.realName} (${a.soldier.username}): ${b.label} → ${a.label}`);
+      lines.push(`${soldierLabel(a.soldier)}: ${b.label} → ${a.label}`);
     } else if (!b && a) {
-      lines.push(`${a.soldier.rankShort} ${a.soldier.realName} (${a.soldier.username}): (new) → ${a.label}`);
+      lines.push(`${soldierLabel(a.soldier)}: (new) → ${a.label}`);
     } else if (b && !a) {
-      lines.push(`${b.soldier.rankShort} ${b.soldier.realName} (${b.soldier.username}): ${b.label} → (removed from roster)`);
+      lines.push(`${soldierLabel(b.soldier)}: ${b.label} → (removed from roster)`);
     }
   }
   return lines.sort();

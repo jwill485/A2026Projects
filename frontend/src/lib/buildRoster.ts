@@ -1,5 +1,6 @@
 import type { ApiLiteProfile, ApiLiteRoster } from "../types/api";
-import type { Battalion, Company, Platoon, RosterData, Soldier, Squad } from "../types/roster";
+import type { Company, Platoon, RosterData, Soldier, Squad } from "../types/roster";
+import { makeBattalion, makeCompany } from "./rosterFactory";
 
 const COMPANY_NAMES: Record<string, string> = {
   A: "Able",
@@ -33,27 +34,6 @@ function sortByRank(soldiers: Soldier[], rankOrder: Map<string, number>): Soldie
   );
 }
 
-function makeCompany(letter: string, name: string): Company {
-  return {
-    letter,
-    name,
-    commander: null,
-    executiveOfficer: null,
-    firstSergeant: null,
-    platoons: [],
-  };
-}
-
-function makeBattalion(): Battalion {
-  return {
-    designation: "2-7",
-    commander: null,
-    executiveOfficer: null,
-    sergeantMajor: null,
-    companies: Object.entries(COMPANY_NAMES).map(([letter, name]) => makeCompany(letter, name)),
-  };
-}
-
 function getPlatoon(company: Company, number: string): Platoon {
   let platoon = company.platoons.find((p) => p.number === number);
   if (!platoon) {
@@ -80,7 +60,10 @@ export function buildRosterData(
   apiRoster: ApiLiteRoster,
   rankOrder: Map<string, number>,
 ): RosterData {
-  const battalion = makeBattalion();
+  const battalion = makeBattalion(
+    "2-7",
+    Object.entries(COMPANY_NAMES).map(([letter, name]) => makeCompany(letter, name)),
+  );
   const unassigned = makeCompany("UNASSIGNED", "ACD");
 
   for (const profile of Object.values(apiRoster.profiles)) {

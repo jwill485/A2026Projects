@@ -1,4 +1,5 @@
 import type { Company, Platoon, RosterData, Soldier } from "../types/roster";
+import { makeCompany } from "./rosterFactory";
 
 export type SlotPath =
   | { kind: "battalionCommander" }
@@ -225,4 +226,86 @@ export function addSquad(roster: RosterData, companyLetter: string, platoonNumbe
   );
   platoon.squads.push({ number: nextNumber, leader: null, members: [] });
   return clone;
+}
+
+export function addCompany(
+  roster: RosterData,
+  letter: string,
+  name: string,
+): { roster: RosterData; ok: boolean } {
+  if (findCompany(roster, letter)) return { roster, ok: false };
+  const clone = structuredClone(roster);
+  clone.battalion.companies.push(makeCompany(letter, name));
+  return { roster: clone, ok: true };
+}
+
+export function deleteSoldier(roster: RosterData, userId: string): RosterData {
+  const clone = structuredClone(roster);
+  removeSoldier(clone, userId);
+  return clone;
+}
+
+function updateInCompany(
+  company: Company,
+  userId: string,
+  patch: Partial<Soldier>,
+): boolean {
+  if (company.commander?.userId === userId) {
+    company.commander = { ...company.commander, ...patch };
+    return true;
+  }
+  if (company.executiveOfficer?.userId === userId) {
+    company.executiveOfficer = { ...company.executiveOfficer, ...patch };
+    return true;
+  }
+  if (company.firstSergeant?.userId === userId) {
+    company.firstSergeant = { ...company.firstSergeant, ...patch };
+    return true;
+  }
+  for (const platoon of company.platoons) {
+    if (platoon.leader?.userId === userId) {
+      platoon.leader = { ...platoon.leader, ...patch };
+      return true;
+    }
+    if (platoon.sergeant?.userId === userId) {
+      platoon.sergeant = { ...platoon.sergeant, ...patch };
+      return true;
+    }
+    for (const squad of platoon.squads) {
+      if (squad.leader?.userId === userId) {
+        squad.leader = { ...squad.leader, ...patch };
+        return true;
+      }
+      const index = squad.members.findIndex((m) => m.userId === userId);
+      if (index !== -1) {
+        squad.members[index] = { ...squad.members[index], ...patch };
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export type SoldierPatch = Partial<
+  Pick<Soldier, "realName" | "rankId" | "rankShort" | "rankFull" | "mos">
+>;
+
+export function updateSoldier(roster: RosterData, userId: string, patch: SoldierPatch): RosterData {
+  const clone = structuredClone(roster);
+  if (clone.battalion.commander?.userId === userId) {
+    clone.battalion.commander = { ...clone.battalion.commander, ...patch };
+    return clone;
+  }
+  if (clone.battalion.executiveOfficer?.userId === userId) {
+    clone.battalion.executiveOfficer = { ...clone.battalion.executiveOfficer, ...patch };
+    return clone;
+  }
+  if (clone.battalion.sergeantMajor?.userId === userId) {
+    clone.battalion.sergeantMajor = { ...clone.battalion.sergeantMajor, ...patch };
+    return clone;
+  }
+  for (const company of allCompanies(clone)) {
+    if (updateInCompany(company, userId, patch)) return clone;
+  }
+  return roster;
 }

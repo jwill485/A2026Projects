@@ -1,3 +1,9 @@
+.draggable-soldier-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
 .draggable-soldier {
   display: inline-block;
   cursor: grab;
@@ -13,6 +19,27 @@
 
 .draggable-soldier.dragging {
   opacity: 0.4;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.1rem 0.2rem;
+  border-radius: 3px;
+}
+
+.icon-btn:hover {
+  background: #333;
+  color: #eee;
+}
+
+.icon-btn-danger:hover {
+  background: #3a2222;
+  color: #e08787;
 }
 
 .drop-slot {
@@ -51,12 +78,46 @@ ul.drop-slot {
   background: #333;
 }
 
+.kanban-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.8rem 0;
+}
+
 .kanban-selectors {
   display: flex;
   gap: 1.5rem;
-  margin: 0.8rem 0;
+  padding: 0.5rem 0.7rem;
+  background: #1a1a19;
+  border-radius: 6px;
   color: #ccc;
   font-size: 0.9rem;
+}
+
+.add-company-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.5rem 0.7rem;
+  background: #1a1a19;
+  border-radius: 6px;
+}
+
+.add-company-form input {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+  width: 90px;
+}
+
+.add-company-form input:focus-visible {
+  outline: 2px solid #ffc72c;
+  outline-offset: 1px;
 }
 
 .kanban-selectors select {
@@ -65,6 +126,11 @@ ul.drop-slot {
   border: 1px solid #444;
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
+}
+
+.kanban-selectors select:focus-visible {
+  outline: 2px solid #ffc72c;
+  outline-offset: 1px;
 }
 
 .kanban-columns {

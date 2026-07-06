@@ -49,4 +49,7 @@
 .changelog-empty {
   color: #898781;
   margin-bottom: 1rem;
+  padding: 0.6rem 0.8rem;
+  background: #1a1a19;
+  border-radius: 6px;
 }

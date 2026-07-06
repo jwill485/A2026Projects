@@ -1,9 +1,21 @@
 .tab-bar {
   display: flex;
-  gap: 0.5rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   margin-bottom: 1rem;
-  border-bottom: 1px solid #333;
-  padding-bottom: 0.6rem;
+}
+
+.tab-group,
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #1a1a19;
+  border: 1px solid #333;
+  border-radius: 8px;
 }
 
 .tab-bar button {
@@ -21,16 +33,40 @@
 }
 
 .tab-bar button.active {
-  background: #3987e5;
-  color: #fff;
-  border-color: #3987e5;
+  background: #ffc72c;
+  color: #1a1a19;
+  border-color: #ffc72c;
+}
+
+.tab-bar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tab-bar .refresh-btn {
-  margin-left: auto;
   background: #241c1c;
   border-color: #d97757;
   color: #d97757;
+}
+
+.tab-bar .blank-btn {
+  background: #1c2420;
+  border-color: #4a7c59;
+  color: #7fc79a;
+}
+
+.tab-bar .blank-btn:hover {
+  background: #22302a;
+}
+
+.tab-bar .revert-btn {
+  background: #2a1c1c;
+  border-color: #b34a4a;
+  color: #e08787;
+}
+
+.tab-bar .revert-btn:hover:not(:disabled) {
+  background: #351f1f;
 }
 
 .tab-bar .refresh-btn:hover {

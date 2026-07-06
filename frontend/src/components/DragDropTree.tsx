@@ -1,7 +1,9 @@
 import { createContext, useContext, useState } from "react";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import type { Battalion, Company, Platoon, RosterData, Soldier, Squad } from "../types/roster";
-import { moveSoldier, addPlatoon, addSquad, type SlotPath } from "../lib/moveSoldier";
+import type { ApiRankExpanded } from "../types/api";
+import { moveSoldier, addPlatoon, addSquad, type SlotPath, type SoldierPatch } from "../lib/moveSoldier";
+import { SoldierForm, type SoldierFormValues } from "./SoldierForm";
 import "./RosterTree.css";
 import "./DragDropTree.css";
 
@@ -12,6 +14,8 @@ function slotId(destination: SlotPath): string {
 interface Actions {
   onAddPlatoon: (company: string) => void;
   onAddSquad: (company: string, platoon: string) => void;
+  onRequestEdit: (soldier: Soldier) => void;
+  onDeleteSoldier: (userId: string) => void;
 }
 
 const ActionsContext = createContext<Actions | null>(null);
@@ -23,18 +27,43 @@ function useActions(): Actions {
 }
 
 function DraggableSoldier({ soldier }: { soldier: Soldier }) {
+  const { onRequestEdit, onDeleteSoldier } = useActions();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: soldier.userId,
   });
   return (
-    <span
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`draggable-soldier${isDragging ? " dragging" : ""}`}
-    >
-      {soldier.rankShort} {soldier.realName}
-      <span className="soldier-username"> ({soldier.username})</span>
+    <span className="draggable-soldier-wrapper">
+      <span
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        className={`draggable-soldier${isDragging ? " dragging" : ""}`}
+      >
+        {soldier.rankShort} {soldier.realName}
+        {soldier.username && <span className="soldier-username"> ({soldier.username})</span>}
+      </span>
+      <button
+        type="button"
+        className="icon-btn"
+        title="Edit soldier"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRequestEdit(soldier);
+        }}
+      >
+        ✎
+      </button>
+      <button
+        type="button"
+        className="icon-btn icon-btn-danger"
+        title="Delete soldier"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDeleteSoldier(soldier.userId);
+        }}
+      >
+        ✕
+      </button>
     </span>
   );
 }
@@ -267,13 +296,27 @@ function PaneColumn({ company }: { company: Company }) {
 export function DragDropTree({
   roster,
   onChange,
+  ranks,
+  onAddCompany,
+  onAddSoldier,
+  onEditSoldier,
+  onDeleteSoldier,
 }: {
   roster: RosterData;
   onChange: (roster: RosterData) => void;
+  ranks: ApiRankExpanded[];
+  onAddCompany: (letter: string, name: string) => boolean;
+  onAddSoldier: (values: SoldierFormValues) => void;
+  onEditSoldier: (userId: string, patch: SoldierPatch) => void;
+  onDeleteSoldier: (userId: string) => void;
 }) {
   const options = paneOptions(roster);
   const [leftLetter, setLeftLetter] = useState("C");
   const [rightLetter, setRightLetter] = useState(roster.unassigned.letter);
+  const [editingSoldier, setEditingSoldier] = useState<Soldier | null>(null);
+  const [creatingSoldier, setCreatingSoldier] = useState(false);
+  const [newCompanyLetter, setNewCompanyLetter] = useState("");
+  const [newCompanyName, setNewCompanyName] = useState("");
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -285,9 +328,24 @@ export function DragDropTree({
     if (result.ok) onChange(result.roster);
   }
 
+  function handleAddCompanySubmit() {
+    const letter = newCompanyLetter.trim().toUpperCase();
+    const name = newCompanyName.trim();
+    if (!letter || !name) return;
+    const ok = onAddCompany(letter, name);
+    if (ok) {
+      setNewCompanyLetter("");
+      setNewCompanyName("");
+    } else {
+      window.alert(`A company with code "${letter}" already exists.`);
+    }
+  }
+
   const actions: Actions = {
     onAddPlatoon: (company) => onChange(addPlatoon(roster, company)),
     onAddSquad: (company, platoon) => onChange(addSquad(roster, company, platoon)),
+    onRequestEdit: (soldier) => setEditingSoldier(soldier),
+    onDeleteSoldier,
   };
 
   return (
@@ -295,27 +353,50 @@ export function DragDropTree({
       <DndContext onDragEnd={handleDragEnd}>
         <BattalionHQ battalion={roster.battalion} />
 
-        <div className="kanban-selectors">
-          <label>
-            Left pane:{" "}
-            <select value={leftLetter} onChange={(e) => setLeftLetter(e.target.value)}>
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Right pane:{" "}
-            <select value={rightLetter} onChange={(e) => setRightLetter(e.target.value)}>
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="kanban-toolbar">
+          <div className="kanban-selectors">
+            <label>
+              Left pane:{" "}
+              <select value={leftLetter} onChange={(e) => setLeftLetter(e.target.value)}>
+                {options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Right pane:{" "}
+              <select value={rightLetter} onChange={(e) => setRightLetter(e.target.value)}>
+                {options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="add-company-form">
+            <input
+              placeholder="Code (e.g. D)"
+              value={newCompanyLetter}
+              onChange={(e) => setNewCompanyLetter(e.target.value)}
+              maxLength={8}
+            />
+            <input
+              placeholder="Name (e.g. Dog)"
+              value={newCompanyName}
+              onChange={(e) => setNewCompanyName(e.target.value)}
+            />
+            <button className="add-btn" onClick={handleAddCompanySubmit}>
+              + Add Company
+            </button>
+          </div>
+
+          <button className="add-btn" onClick={() => setCreatingSoldier(true)}>
+            + Add Soldier
+          </button>
         </div>
 
         <div className="kanban-columns">
@@ -323,6 +404,30 @@ export function DragDropTree({
           <PaneColumn company={findPane(roster, rightLetter)} />
         </div>
       </DndContext>
+
+      {creatingSoldier && (
+        <SoldierForm
+          ranks={ranks}
+          title="Add Soldier"
+          onCancel={() => setCreatingSoldier(false)}
+          onSubmit={(values) => {
+            onAddSoldier(values);
+            setCreatingSoldier(false);
+          }}
+        />
+      )}
+      {editingSoldier && (
+        <SoldierForm
+          ranks={ranks}
+          initial={editingSoldier}
+          title="Edit Soldier"
+          onCancel={() => setEditingSoldier(null)}
+          onSubmit={(values) => {
+            onEditSoldier(editingSoldier.userId, values);
+            setEditingSoldier(null);
+          }}
+        />
+      )}
     </ActionsContext.Provider>
   );
 }
