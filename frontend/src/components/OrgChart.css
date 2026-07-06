@@ -1,0 +1,149 @@
+.org-chart-scroll {
+  overflow-x: auto;
+  padding: 1rem 0.5rem;
+}
+
+.org-chart-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.org-chart-toolbar button {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.org-branch {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Scoped to direct children only, so this never leaks into the
+   .chart-roster member list nested inside a squad's chart-node. */
+.org-branch > li {
+  display: inline-block;
+  vertical-align: top;
+  padding: 20px 8px 0 8px;
+  position: relative;
+  list-style: none;
+}
+
+.org-branch > li::before,
+.org-branch > li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 20px;
+  border-top: 1px solid #4a4a4a;
+}
+.org-branch > li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1px solid #4a4a4a;
+}
+.org-branch > li:only-child::before,
+.org-branch > li:only-child::after {
+  display: none;
+}
+.org-branch > li:only-child {
+  padding-top: 0;
+}
+.org-branch > li:first-child::before,
+.org-branch > li:last-child::after {
+  border: 0 none;
+}
+.org-branch > li:last-child::before {
+  border-right: 1px solid #4a4a4a;
+  border-radius: 0 6px 0 0;
+}
+.org-branch > li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+
+.chart-node {
+  display: inline-block;
+  text-align: left;
+  white-space: normal;
+  min-width: 150px;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  background: #1c1c1c;
+}
+
+.chart-title {
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.2rem;
+}
+
+.chart-role {
+  color: #bbb;
+  font-size: 0.8rem;
+}
+
+.chart-battalion {
+  background: #14202e;
+  border-color: #ffc72c;
+}
+
+.chart-company {
+  background: #1c2a1c;
+}
+
+.chart-unassigned {
+  border: 1px dashed #d97757;
+  background: #241c1c;
+}
+
+.chart-platoon {
+  background: #24242e;
+}
+
+.chart-squad {
+  background: #1c1c1c;
+}
+
+.chart-toggle {
+  display: block;
+  margin-top: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  color: #9cc7ff;
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.chart-toggle:hover {
+  background: #26344a;
+}
+
+.chart-roster {
+  list-style: none;
+  margin: 0.3rem 0 0 0;
+  padding: 0.3rem 0 0 0;
+  border-top: 1px solid #333;
+  font-size: 0.78rem;
+  color: #ccc;
+  max-height: 160px;
+  min-width: 140px;
+  max-width: 220px;
+  overflow-y: auto;
+  white-space: normal;
+}
+
+.chart-roster li {
+  padding: 0.05rem 0;
+  list-style: none;
+}

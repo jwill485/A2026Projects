@@ -111,7 +111,7 @@ export function ImportCompanyPicker({
               return (
                 <li key={company.letter} className="import-row">
                   <span className="import-name">{companyLabel(company)}</span>
-                  <span className="import-unit">{countCompanySoldiers(company)} soldiers</span>
+                  <span className="import-unit">{countCompanySoldiers(company)} troopers</span>
                   <button disabled={isImported} onClick={() => handleImport(company)}>
                     {isImported ? "Imported" : "Import"}
                   </button>

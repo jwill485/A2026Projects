@@ -39,6 +39,7 @@ import { DragDropTree } from "./components/DragDropTree";
 import { AnalyticsTab } from "./components/AnalyticsTab";
 import { ChangeLogPanel } from "./components/ChangeLogPanel";
 import { RosterPicker } from "./components/RosterPicker";
+import { OrgChart } from "./components/OrgChart";
 import type { Company, RosterData, Soldier } from "./types/roster";
 import type { ApiRankExpanded } from "./types/api";
 import "./App.css";
@@ -56,8 +57,10 @@ function App() {
   const [rankOrder, setRankOrder] = useState<Map<string, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("roster");
+  const [showOrgChart, setShowOrgChart] = useState(false);
 
   function activateRoster(id: string) {
+    setShowOrgChart(false);
     setRosterId(id);
     const loadedRoster = loadRoster(id);
     setRoster(loadedRoster);
@@ -171,7 +174,7 @@ function App() {
 
   function handleDeleteSoldier(userId: string) {
     if (!roster) return;
-    if (!window.confirm("Delete this soldier? This cannot be undone (other than Revert).")) return;
+    if (!window.confirm("Delete this trooper? This cannot be undone (other than Revert).")) return;
     handleChange(deleteSoldier(roster, userId));
   }
 
@@ -321,8 +324,23 @@ function App() {
               Viewing: {activeConfiguration === "old" ? "Old Configuration (pre-split)" : "New Configuration (post-split)"}
             </div>
           )}
-          <RosterTree battalion={roster.battalion} />
-          <UnassignedPool group={roster.unassigned} />
+          <button
+            className="add-btn"
+            style={{ marginBottom: "0.8rem" }}
+            onClick={() => setShowOrgChart((v) => !v)}
+            disabled={pendingChanges > 0}
+            title={pendingChanges > 0 ? "Save or revert your changes first" : undefined}
+          >
+            {showOrgChart ? "Hide Org Chart" : "Generate Org Chart"}
+          </button>
+          {showOrgChart && pendingChanges === 0 ? (
+            <OrgChart battalion={roster.battalion} unassigned={roster.unassigned} />
+          ) : (
+            <>
+              <RosterTree battalion={roster.battalion} />
+              <UnassignedPool group={roster.unassigned} />
+            </>
+          )}
         </>
       )}
       {tab === "dragdrop" && (

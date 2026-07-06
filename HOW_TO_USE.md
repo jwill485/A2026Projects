@@ -1,7 +1,7 @@
 # RosterManager — How to Use
 
 A visual tool for managing the 2-7 Cavalry Battalion's org structure: view the
-live roster, drag-and-drop soldiers between billets, track changes, and build
+live roster, drag-and-drop troopers between billets, track changes, and build
 out custom/alternate rosters — including breaking the battalion down into a
 new configuration — without touching the real 2-7 data.
 
@@ -67,14 +67,20 @@ Next to the roster dropdown are two more boxes: the **tabs** (what you're
 viewing) and the **action buttons** (things you can do). The tabs are:
 
 - **Battalion Roster** — a read-only tree view of the current roster:
-  Battalion HQ → Companies → Platoons → Squads → soldiers, plus a separate
+  Battalion HQ → Companies → Platoons → Squads → troopers, plus a separate
   Unassigned pool below it. If the active roster has a Configuration tag set,
   a colored badge appears here reading "Viewing: Old Configuration" or
   "Viewing: New Configuration" so it's always clear which one you're looking
-  at.
-- **Drag & Drop** — the same structure, but editable: drag soldiers between
+  at. A **Generate Org Chart** button swaps the tree for a box-and-connector
+  chart instead — it's disabled whenever you have unsaved changes (same rule
+  as Save Changes), so it only ever shows a saved/settled roster; click
+  **Hide Org Chart** to go back to the tree. Squad member lists stay
+  collapsed by default to keep the chart compact — click **Show N members**
+  on a squad to expand just that one, or use **Expand All** / **Collapse
+  All** above the chart.
+- **Drag & Drop** — the same structure, but editable: drag troopers between
   billets, add companies/platoons/squads, and add/edit/delete/import
-  soldiers and whole companies.
+  troopers and whole companies.
 - **Analytics** — charts and tables: leadership fill rate, headcount, MOS
   breakdown, and a vacancy report.
 
@@ -103,19 +109,19 @@ Unassigned pool) each side shows:
 
 - **Other (left)** — whatever you want a second view of: an old company
   you're breaking down, a comparison, or just anywhere else.
-- **Building (right — new soldiers land here)** — this is the destination.
-  Anyone brought in via **+ Add Soldier** or **+ Import Soldier** lands here,
+- **Building (right — new troopers land here)** — this is the destination.
+  Anyone brought in via **+ Add Trooper** or **+ Import Trooper** lands here,
   so point it at whichever company you're currently populating.
 
 You can point both dropdowns at the same company if you just want one big
 pane instead of two.
 
-- **Dragging a soldier**: click and hold their name, drag to any billet
+- **Dragging a trooper**: click and hold their name, drag to any billet
   (Commander, XO, 1SG, Platoon Leader/Sergeant, Squad Leader, or a squad's
   member list) in either pane, and release. Occupied billets are
   **blocked** — you can't drop onto a slot that already has someone in it;
   move or remove the current occupant first.
-- **✎ (edit)** next to a soldier's name — opens a form to change their name,
+- **✎ (edit)** next to a trooper's name — opens a form to change their name,
   rank, or MOS without moving them.
   **✕ (delete)** — removes them from the roster entirely (with confirmation).
   These are separate from the name itself so clicking them doesn't start a
@@ -125,21 +131,21 @@ pane instead of two.
   one is harmless, just leave it.
 - **+ Add Company** — type a short code (e.g. `D`) and a name (e.g. `Dog`),
   then click Add Company. Codes must be unique within the roster.
-- **+ Add Soldier** — opens a form (name, rank, MOS) and drops the new
-  soldier into whichever company the **Building** pane is currently pointed
+- **+ Add Trooper** — opens a form (name, rank, MOS) and drops the new
+  trooper into whichever company the **Building** pane is currently pointed
   at, ready to drag into place.
-- **+ Import Soldier** — opens a searchable list of every real soldier
+- **+ Import Trooper** — opens a searchable list of every real trooper
   currently in the live 2-7 + B/ACD roster (name, rank, current real-world
   unit). Click **Add** next to anyone to copy them into the **Building** pane
   with their real name/rank/MOS — useful for seeding a custom roster without
-  typing everyone in by hand. Already-imported soldiers show **Added** and
+  typing everyone in by hand. Already-imported troopers show **Added** and
   can't be added twice.
 - **+ Import Company** — brings in an *entire* real company at once —
   Able, Baker, Charlie, Easy, or **Unassigned (B/ACD)** — with its full
   platoon/squad structure and leadership intact, instead of adding people one
   at a time. Importing Unassigned (B/ACD) merges its real structure into your
   roster's own Unassigned pool (every roster already has one, so it doesn't
-  show up as a separate pane). If a soldier from that company already exists
+  show up as a separate pane). If a trooper from that company already exists
   elsewhere in your roster (e.g. you'd already imported them individually),
   they're quietly skipped rather than duplicated. Already-imported companies
   show **Imported** and can't be re-added.
@@ -149,7 +155,7 @@ see the Change Log entry below.
 
 ## Unassigned pool
 
-Soldiers from B/ACD (or anyone not yet placed in a company) live in a
+Troopers from B/ACD (or anyone not yet placed in a company) live in a
 separate **Unassigned** group, organized the same way as a company
 (platoons/squads) rather than as a flat list. Select it from either pane
 dropdown in Drag & Drop to move people out of it.
@@ -173,7 +179,7 @@ named roster:
    Configuration → Old).
 2. Create a **+ New Roster** per new battalion, tagged **New**.
 3. In each new roster, use **+ Import Company** to pull in whichever old
-   companies (or B/ACD) are being folded into it, then drag soldiers between
+   companies (or B/ACD) are being folded into it, then drag troopers between
    panes to actually divide them up — the **Change Log** will show exactly
    where each person came from.
 
@@ -187,7 +193,7 @@ around, click Save Changes when you're happy (this logs what changed), or
 Revert Changes to back out before saving.
 
 **Building a custom/alternate roster:** click + New Roster (Blank), then use
-+ Add Company to lay out your structure, + Import Soldier or + Import Company
++ Add Company to lay out your structure, + Import Trooper or + Import Company
 to pull in real people, and drag them into place.
 
 **Splitting the battalion into two:** see [Tagging Old vs. New](#tagging-old-vs-new-battalion-split)

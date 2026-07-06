@@ -67,7 +67,7 @@ export function AnalyticsTab({ roster }: { roster: RosterData }) {
         <h2>Headcount by Company</h2>
         {tableView ? (
           <DataTable
-            headers={["Company", "Soldiers"]}
+            headers={["Company", "Troopers"]}
             rows={headcount.map((d) => [d.label, d.value])}
           />
         ) : (

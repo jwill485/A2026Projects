@@ -48,7 +48,7 @@ function DraggableSoldier({ soldier }: { soldier: Soldier }) {
       <button
         type="button"
         className="icon-btn"
-        title="Edit soldier"
+        title="Edit trooper"
         onClick={(e) => {
           e.stopPropagation();
           onRequestEdit(soldier);
@@ -59,7 +59,7 @@ function DraggableSoldier({ soldier }: { soldier: Soldier }) {
       <button
         type="button"
         className="icon-btn icon-btn-danger"
-        title="Delete soldier"
+        title="Delete trooper"
         onClick={(e) => {
           e.stopPropagation();
           onDeleteSoldier(soldier.userId);
@@ -118,7 +118,7 @@ function DroppableMemberList({
           <DraggableSoldier soldier={member} />
         </li>
       ))}
-      {members.length === 0 && <li className="vacant">Drop soldiers here</li>}
+      {members.length === 0 && <li className="vacant">Drop troopers here</li>}
     </ul>
   );
 }
@@ -288,7 +288,7 @@ function PaneColumn({ company }: { company: Company }) {
     <div className={`kanban-column${isUnassigned ? " unassigned-pool" : ""}`}>
       {isUnassigned && (
         <p className="unassigned-hint">
-          From B/ACD — drag soldiers into Charlie Company (or anywhere else) to reassign them.
+          From B/ACD — drag troopers into Charlie Company (or anywhere else) to reassign them.
         </p>
       )}
       <DragDropCompany company={company} />
@@ -399,7 +399,7 @@ export function DragDropTree({
               </select>
             </label>
             <label>
-              Building (right — new soldiers land here):{" "}
+              Building (right — new troopers land here):{" "}
               <select value={rightLetter} onChange={(e) => setRightLetter(e.target.value)}>
                 {options.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -428,10 +428,10 @@ export function DragDropTree({
           </div>
 
           <button className="add-btn" onClick={() => setCreatingSoldier(true)}>
-            + Add Soldier
+            + Add Trooper
           </button>
           <button className="add-btn" onClick={() => setImporting(true)}>
-            + Import Soldier
+            + Import Trooper
           </button>
           <button className="add-btn" onClick={() => setImportingCompany(true)}>
             + Import Company
@@ -447,7 +447,7 @@ export function DragDropTree({
       {creatingSoldier && (
         <SoldierForm
           ranks={ranks}
-          title="Add Soldier"
+          title="Add Trooper"
           onCancel={() => setCreatingSoldier(false)}
           onSubmit={(values) => {
             onAddSoldier(values);
@@ -459,7 +459,7 @@ export function DragDropTree({
         <SoldierForm
           ranks={ranks}
           initial={editingSoldier}
-          title="Edit Soldier"
+          title="Edit Trooper"
           onCancel={() => setEditingSoldier(null)}
           onSubmit={(values) => {
             onEditSoldier(editingSoldier.userId, values);
