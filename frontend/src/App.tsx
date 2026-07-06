@@ -306,6 +306,7 @@ function App() {
       {tab === "dragdrop" && (
         <DragDropTree
           roster={roster}
+          rosterId={rosterId}
           onChange={handleChange}
           ranks={ranks}
           onAddCompany={handleAddCompany}

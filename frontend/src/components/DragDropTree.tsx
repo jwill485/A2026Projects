@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import type { Battalion, Company, Platoon, RosterData, Soldier, Squad } from "../types/roster";
 import type { ApiRankExpanded } from "../types/api";
@@ -297,6 +297,7 @@ function PaneColumn({ company }: { company: Company }) {
 
 export function DragDropTree({
   roster,
+  rosterId,
   onChange,
   ranks,
   onAddCompany,
@@ -306,6 +307,7 @@ export function DragDropTree({
   onImportSoldier,
 }: {
   roster: RosterData;
+  rosterId: string;
   onChange: (roster: RosterData) => void;
   ranks: ApiRankExpanded[];
   onAddCompany: (letter: string, name: string) => boolean;
@@ -315,13 +317,35 @@ export function DragDropTree({
   onImportSoldier: (soldier: Soldier) => boolean;
 }) {
   const options = paneOptions(roster);
-  const [leftLetter, setLeftLetter] = useState("C");
+  const [leftLetter, setLeftLetter] = useState(
+    () => paneOptions(roster)[0]?.value ?? roster.unassigned.letter,
+  );
   const [rightLetter, setRightLetter] = useState(roster.unassigned.letter);
   const [editingSoldier, setEditingSoldier] = useState<Soldier | null>(null);
   const [creatingSoldier, setCreatingSoldier] = useState(false);
   const [importing, setImporting] = useState(false);
   const [newCompanyLetter, setNewCompanyLetter] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
+
+  // Switching to a *different named roster* can leave the previously-selected
+  // pane letters invalid (a blank/custom roster with different company codes)
+  // or, since "Unassigned" always exists, silently collapse both panes onto
+  // it. Reconcile only on an actual roster switch (not on every edit within
+  // the same roster — that would fight the deliberate "same company on both
+  // sides" use case during a drag session).
+  useEffect(() => {
+    const validLetters = options.map((o) => o.value);
+    const validSet = new Set(validLetters);
+    let nextLeft = validSet.has(leftLetter) ? leftLetter : (validLetters[0] ?? roster.unassigned.letter);
+    let nextRight = validSet.has(rightLetter) ? rightLetter : roster.unassigned.letter;
+    if (nextLeft === nextRight && validLetters.length > 1) {
+      const alt = validLetters.find((v) => v !== nextLeft);
+      if (alt) nextRight = alt;
+    }
+    setLeftLetter(nextLeft);
+    setRightLetter(nextRight);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rosterId]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
