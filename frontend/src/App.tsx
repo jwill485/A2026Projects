@@ -27,9 +27,11 @@ import {
   touchRoster,
   createRoster,
   renameRoster,
+  setRosterConfiguration,
   deleteRoster,
   migrateLegacyStorage,
   type ChangeLogEntry,
+  type RosterConfiguration,
   type RosterSummary,
 } from "./lib/persistence";
 import { RosterTree, UnassignedPool } from "./components/RosterTree";
@@ -108,15 +110,20 @@ function App() {
     activateRoster(id);
   }
 
-  function handleCreateRoster(name: string, mode: "blank" | "duplicate") {
+  function handleCreateRoster(
+    name: string,
+    mode: "blank" | "duplicate",
+    configuration: RosterConfiguration | undefined,
+  ) {
     const starting = mode === "duplicate" && roster ? structuredClone(roster) : makeBlankRoster();
-    const id = createRoster(name, starting);
+    const id = createRoster(name, starting, starting, configuration);
     setRosterList(listRosters());
     activateRoster(id);
   }
 
-  function handleRenameRoster(id: string, name: string) {
+  function handleRenameRoster(id: string, name: string, configuration: RosterConfiguration | undefined) {
     renameRoster(id, name);
+    setRosterConfiguration(id, configuration);
     setRosterList(listRosters());
   }
 
@@ -255,6 +262,7 @@ function App() {
   }
 
   const pendingChanges = diffRosters(baseline, roster).length;
+  const activeConfiguration = rosterList.find((r) => r.id === rosterId)?.configuration;
 
   return (
     <section id="center" style={{ alignItems: "stretch", maxWidth: "900px" }}>
@@ -308,6 +316,11 @@ function App() {
 
       {tab === "roster" && (
         <>
+          {activeConfiguration && (
+            <div className={`config-badge config-badge-${activeConfiguration}`}>
+              Viewing: {activeConfiguration === "old" ? "Old Configuration (pre-split)" : "New Configuration (post-split)"}
+            </div>
+          )}
           <RosterTree battalion={roster.battalion} />
           <UnassignedPool group={roster.unassigned} />
         </>

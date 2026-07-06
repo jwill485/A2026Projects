@@ -390,22 +390,31 @@ The full (non-lite) `Profile` adds `records[]` and `awards[]`.
 - **User authentication:** Multi-user access with role-based permissions
 - **Change log:** Audit trail of roster changes with timestamps
 
-### 8.1 Planned: Battalion Split (2-7 → Two Battalions)
+### 8.1 In Progress: Battalion Split (2-7 → Two Battalions)
 
 2-7 Cavalry is expected to eventually split into **two** battalions, each with its
-own companies. Working names so far: **HLLV** and **HLLWW2**. During the
-transition, the app should show **three groups**: HLLV, HLLWW2, and an
-**Unassigned** group holding any company not yet placed into one of the two new
-battalions — the same pattern already used for individual soldiers (B/ACD →
-Unassigned pool), but one level up (companies, not soldiers).
+own companies. Working names so far: **HLLV** and **HLLWW2**.
 
-This needs a **Group layer** above Company in the data model (today there's one
-implicit group — 2-7 — holding all four companies; this would generalize to N
-groups, each holding a subset of companies, with company-to-group reassignment
-working like the existing soldier move engine). Decided approach: **do this on a
-separate git branch** when the split becomes active work, rather than
-restructuring the data model on `master` speculatively — keeps `master` stable
-if the branch needs to be reworked or abandoned.
+Originally sketched as a **Group layer** above Company in the data model (a
+single roster holding multiple battalions/groups at once). Decided instead to
+build this using the already-shipped **multiple named rosters** feature
+(§8.3) rather than restructuring `RosterData`: the current live roster stays
+as-is, and each new battalion (HLLV, HLLWW2) is built out as its own separate
+named roster, populated by breaking down the old companies via **Import
+Company from 2-7** (pulls a whole company, or the B/ACD group, into the
+active roster in one action) and **Import Soldier** (which now lands imports
+in whichever pane is marked "Building" on the right side of Drag & Drop). No
+data-model change needed — every roster already has exactly one battalion,
+which is precisely what each split-off battalion is.
+
+To tell them apart at a glance, each `RosterSummary` can carry an optional
+`configuration: "old" | "new"` tag (set via the New Roster / Rename modals in
+`RosterPicker`), and the Battalion Roster tab shows a colored **"Viewing: Old
+Configuration" / "Viewing: New Configuration"** badge based on the active
+roster's tag. Untagged rosters show no badge.
+
+Building this on a separate git branch (`battalion-split`), per the original
+decision to keep `master` stable while this is worked out.
 
 ### 8.2 Planned: Org Chart View
 

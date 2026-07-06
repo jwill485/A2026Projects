@@ -1,21 +1,50 @@
 import { useState } from "react";
-import type { RosterSummary } from "../lib/persistence";
+import type { RosterConfiguration, RosterSummary } from "../lib/persistence";
 import "./SoldierForm.css";
+
+function configurationLabel(configuration: RosterConfiguration | undefined): string {
+  if (configuration === "old") return "Old";
+  if (configuration === "new") return "New";
+  return "";
+}
+
+function ConfigurationSelect({
+  value,
+  onChange,
+}: {
+  value: RosterConfiguration | "";
+  onChange: (value: RosterConfiguration | undefined) => void;
+}) {
+  return (
+    <label>
+      Configuration
+      <select
+        value={value}
+        onChange={(e) => onChange((e.target.value || undefined) as RosterConfiguration | undefined)}
+      >
+        <option value="">None</option>
+        <option value="old">Old (pre-split)</option>
+        <option value="new">New (post-split)</option>
+      </select>
+    </label>
+  );
+}
 
 function NewRosterModal({
   onCancel,
   onSubmit,
 }: {
   onCancel: () => void;
-  onSubmit: (name: string, mode: "blank" | "duplicate") => void;
+  onSubmit: (name: string, mode: "blank" | "duplicate", configuration: RosterConfiguration | undefined) => void;
 }) {
   const [name, setName] = useState("");
   const [mode, setMode] = useState<"blank" | "duplicate">("blank");
+  const [configuration, setConfiguration] = useState<RosterConfiguration | "">("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    onSubmit(name.trim(), mode);
+    onSubmit(name.trim(), mode, configuration || undefined);
   }
 
   return (
@@ -33,6 +62,7 @@ function NewRosterModal({
             <option value="duplicate">Duplicate current roster</option>
           </select>
         </label>
+        <ConfigurationSelect value={configuration} onChange={(v) => setConfiguration(v ?? "")} />
         <div className="soldier-form-actions">
           <button type="button" onClick={onCancel}>
             Cancel
@@ -48,29 +78,33 @@ function NewRosterModal({
 
 function RenameRosterModal({
   initialName,
+  initialConfiguration,
   onCancel,
   onSubmit,
 }: {
   initialName: string;
+  initialConfiguration: RosterConfiguration | undefined;
   onCancel: () => void;
-  onSubmit: (name: string) => void;
+  onSubmit: (name: string, configuration: RosterConfiguration | undefined) => void;
 }) {
   const [name, setName] = useState(initialName);
+  const [configuration, setConfiguration] = useState<RosterConfiguration | "">(initialConfiguration ?? "");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    onSubmit(name.trim());
+    onSubmit(name.trim(), configuration || undefined);
   }
 
   return (
     <div className="soldier-form-backdrop" onClick={onCancel}>
       <form className="soldier-form" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h3>Rename Roster</h3>
+        <h3>Edit Roster</h3>
         <label>
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </label>
+        <ConfigurationSelect value={configuration} onChange={(v) => setConfiguration(v ?? "")} />
         <div className="soldier-form-actions">
           <button type="button" onClick={onCancel}>
             Cancel
@@ -95,13 +129,13 @@ export function RosterPicker({
   rosterList: RosterSummary[];
   activeRosterId: string;
   onSwitch: (id: string) => void;
-  onCreate: (name: string, mode: "blank" | "duplicate") => void;
-  onRename: (id: string, name: string) => void;
+  onCreate: (name: string, mode: "blank" | "duplicate", configuration: RosterConfiguration | undefined) => void;
+  onRename: (id: string, name: string, configuration: RosterConfiguration | undefined) => void;
   onDelete: (id: string) => void;
 }) {
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState(false);
-  const activeName = rosterList.find((r) => r.id === activeRosterId)?.name ?? "";
+  const active = rosterList.find((r) => r.id === activeRosterId);
 
   return (
     <div className="roster-group">
@@ -109,6 +143,7 @@ export function RosterPicker({
         {rosterList.map((r) => (
           <option key={r.id} value={r.id}>
             {r.name}
+            {r.configuration ? ` (${configurationLabel(r.configuration)})` : ""}
           </option>
         ))}
       </select>
@@ -127,18 +162,19 @@ export function RosterPicker({
       {creating && (
         <NewRosterModal
           onCancel={() => setCreating(false)}
-          onSubmit={(name, mode) => {
-            onCreate(name, mode);
+          onSubmit={(name, mode, configuration) => {
+            onCreate(name, mode, configuration);
             setCreating(false);
           }}
         />
       )}
-      {renaming && (
+      {renaming && active && (
         <RenameRosterModal
-          initialName={activeName}
+          initialName={active.name}
+          initialConfiguration={active.configuration}
           onCancel={() => setRenaming(false)}
-          onSubmit={(name) => {
-            onRename(activeRosterId, name);
+          onSubmit={(name, configuration) => {
+            onRename(activeRosterId, name, configuration);
             setRenaming(false);
           }}
         />

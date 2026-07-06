@@ -21,10 +21,16 @@ export interface ChangeLogEntry {
   changes: string[];
 }
 
+export type RosterConfiguration = "old" | "new";
+
 export interface RosterSummary {
   id: string;
   name: string;
   updatedAt: string;
+  // Tags this roster as the pre-split ("old") or post-split ("new") battalion
+  // configuration, for the Battalion Roster tab's viewing-context badge.
+  // Untagged for rosters unrelated to the split.
+  configuration?: RosterConfiguration;
 }
 
 function loadJson<T>(key: string): T | null {
@@ -94,13 +100,18 @@ export function touchRoster(id: string): void {
   touchIndexEntry(id);
 }
 
-export function createRoster(name: string, roster: RosterData, baseline: RosterData = roster): string {
+export function createRoster(
+  name: string,
+  roster: RosterData,
+  baseline: RosterData = roster,
+  configuration?: RosterConfiguration,
+): string {
   const id = crypto.randomUUID();
   saveRoster(id, roster);
   saveBaseline(id, baseline);
   saveChangeLog(id, []);
   const index = listRosters();
-  index.push({ id, name, updatedAt: new Date().toISOString() });
+  index.push({ id, name, updatedAt: new Date().toISOString(), configuration });
   saveIndex(index);
   return id;
 }
@@ -110,6 +121,15 @@ export function renameRoster(id: string, name: string): void {
   const entry = index.find((r) => r.id === id);
   if (entry) {
     entry.name = name;
+    saveIndex(index);
+  }
+}
+
+export function setRosterConfiguration(id: string, configuration: RosterConfiguration | undefined): void {
+  const index = listRosters();
+  const entry = index.find((r) => r.id === id);
+  if (entry) {
+    entry.configuration = configuration;
     saveIndex(index);
   }
 }
