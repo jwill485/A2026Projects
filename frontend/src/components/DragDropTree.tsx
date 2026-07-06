@@ -1,7 +1,7 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState } from "react";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import type { Battalion, Company, Platoon, RosterData, Soldier, Squad } from "../types/roster";
-import { isSlotOccupied, moveSoldier, addPlatoon, addSquad, type SlotPath } from "../lib/moveSoldier";
+import { moveSoldier, addPlatoon, addSquad, type SlotPath } from "../lib/moveSoldier";
 import "./RosterTree.css";
 import "./DragDropTree.css";
 
@@ -236,6 +236,34 @@ function BattalionHQ({ battalion }: { battalion: Battalion }) {
   );
 }
 
+function paneOptions(roster: RosterData): { value: string; label: string }[] {
+  return [
+    ...roster.battalion.companies.map((c) => ({
+      value: c.letter,
+      label: `${c.name} Company (${c.letter})`,
+    })),
+    { value: roster.unassigned.letter, label: "Unassigned (B/ACD)" },
+  ];
+}
+
+function findPane(roster: RosterData, letter: string): Company {
+  return roster.battalion.companies.find((c) => c.letter === letter) ?? roster.unassigned;
+}
+
+function PaneColumn({ company }: { company: Company }) {
+  const isUnassigned = company.letter === "UNASSIGNED";
+  return (
+    <div className={`kanban-column${isUnassigned ? " unassigned-pool" : ""}`}>
+      {isUnassigned && (
+        <p className="unassigned-hint">
+          From B/ACD — drag soldiers into Charlie Company (or anywhere else) to reassign them.
+        </p>
+      )}
+      <DragDropCompany company={company} />
+    </div>
+  );
+}
+
 export function DragDropTree({
   roster,
   onChange,
@@ -243,6 +271,10 @@ export function DragDropTree({
   roster: RosterData;
   onChange: (roster: RosterData) => void;
 }) {
+  const options = paneOptions(roster);
+  const [leftLetter, setLeftLetter] = useState("C");
+  const [rightLetter, setRightLetter] = useState(roster.unassigned.letter);
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over) return;
@@ -262,15 +294,33 @@ export function DragDropTree({
     <ActionsContext.Provider value={actions}>
       <DndContext onDragEnd={handleDragEnd}>
         <BattalionHQ battalion={roster.battalion} />
-        {roster.battalion.companies.map((company) => (
-          <DragDropCompany key={company.letter} company={company} />
-        ))}
-        <div className="unassigned-pool">
-          <h3>Unassigned</h3>
-          <p className="unassigned-hint">
-            From B/ACD — drag soldiers into Charlie Company (or anywhere else) to reassign them.
-          </p>
-          <DragDropCompany company={roster.unassigned} />
+
+        <div className="kanban-selectors">
+          <label>
+            Left pane:{" "}
+            <select value={leftLetter} onChange={(e) => setLeftLetter(e.target.value)}>
+              {options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Right pane:{" "}
+            <select value={rightLetter} onChange={(e) => setRightLetter(e.target.value)}>
+              {options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="kanban-columns">
+          <PaneColumn company={findPane(roster, leftLetter)} />
+          <PaneColumn company={findPane(roster, rightLetter)} />
         </div>
       </DndContext>
     </ActionsContext.Provider>

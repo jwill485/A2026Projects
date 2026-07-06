@@ -390,6 +390,23 @@ The full (non-lite) `Profile` adds `records[]` and `awards[]`.
 - **User authentication:** Multi-user access with role-based permissions
 - **Change log:** Audit trail of roster changes with timestamps
 
+### 8.1 Planned: Battalion Split (2-7 → Two Battalions)
+
+2-7 Cavalry is expected to eventually split into **two** battalions, each with its
+own companies. Working names so far: **HLLV** and **HLLWW2**. During the
+transition, the app should show **three groups**: HLLV, HLLWW2, and an
+**Unassigned** group holding any company not yet placed into one of the two new
+battalions — the same pattern already used for individual soldiers (B/ACD →
+Unassigned pool), but one level up (companies, not soldiers).
+
+This needs a **Group layer** above Company in the data model (today there's one
+implicit group — 2-7 — holding all four companies; this would generalize to N
+groups, each holding a subset of companies, with company-to-group reassignment
+working like the existing soldier move engine). Decided approach: **do this on a
+separate git branch** when the split becomes active work, rather than
+restructuring the data model on `master` speculatively — keeps `master` stable
+if the branch needs to be reworked or abandoned.
+
 ---
 
 ## 9. Success Metrics
