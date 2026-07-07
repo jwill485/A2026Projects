@@ -42,6 +42,16 @@
   color: #e08787;
 }
 
+.icon-btn:disabled {
+  color: #444;
+  cursor: not-allowed;
+}
+
+.icon-btn:disabled:hover {
+  background: transparent;
+  color: #444;
+}
+
 .drop-slot {
   display: inline-block;
   border-radius: 4px;

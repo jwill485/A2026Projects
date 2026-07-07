@@ -77,12 +77,30 @@ viewing) and the **action buttons** (things you can do). The tabs are:
   **Hide Org Chart** to go back to the tree. Squad member lists stay
   collapsed by default to keep the chart compact — click **Show N members**
   on a squad to expand just that one, or use **Expand All** / **Collapse
-  All** above the chart.
+  All** above the chart. A **Print Roster** button swaps the tree for a flat,
+  indented list of the whole battalion (one line per billet) — unlike the
+  org chart, it works even with unsaved changes. Use your browser's Print
+  (or Save as PDF) while it's open for a clean printout without the app's
+  nav/buttons; click **Hide Roster List** to go back to the tree. A
+  **Commit Split** button generates (or updates) the `HLLV`/`HLLWW2`
+  rosters from every trooper's split-status tag — see
+  [Tagging Old vs. New](#tagging-old-vs-new-battalion-split) below.
 - **Drag & Drop** — the same structure, but editable: drag troopers between
   billets, add companies/platoons/squads, and add/edit/delete/import
   troopers and whole companies.
 - **Analytics** — charts and tables: leadership fill rate, headcount, MOS
   breakdown, and a vacancy report.
+
+## Search & filter
+
+A filter bar sits above both the Battalion Roster and Drag & Drop tabs (one
+shared filter — it stays active if you switch between them): a name search
+box, **Rank** and **MOS** dropdowns (fixed lists, not free typing), and a
+**Vacant leadership only** checkbox. Matches get a yellow highlight;
+companies/platoons/squads with no match anywhere inside them disappear from
+view entirely. It's purely visual — dragging, editing, and every other
+action still works normally underneath — and **Clear filter** (shown only
+while a filter is active) instantly brings everything back.
 
 ## Action buttons (top bar)
 
@@ -127,8 +145,11 @@ pane instead of two.
   These are separate from the name itself so clicking them doesn't start a
   drag.
 - **+ Add Platoon** / **+ Add Squad** — adds an empty platoon to a company, or
-  an empty squad to a platoon. There's no remove for these — an unused empty
-  one is harmless, just leave it.
+  an empty squad to a platoon. Each platoon/squad also has a small ✕ next to
+  its name to remove it — but only while it's empty (no leader/sergeant, and
+  for a platoon, none of its squads have anyone in them either); otherwise
+  the ✕ is disabled with a tooltip explaining why. Move everyone out first if
+  you want to remove a populated one.
 - **+ Add Company** — type a short code (e.g. `D`) and a name (e.g. `Dog`),
   then click Add Company. Codes must be unique within the roster.
 - **+ Add Trooper** — opens a form (name, rank, MOS) and drops the new
@@ -171,10 +192,27 @@ for copying numbers out). Includes:
 
 ## Tagging Old vs. New (battalion split)
 
-2-7 is expected to eventually split into two battalions. Rather than one
-roster trying to represent both at once, build each one as its own separate
-named roster:
+2-7 is expected to eventually split into two battalions (working names
+**HLLV** and **HLLWW2**). Rather than one roster trying to represent both at
+once, each ends up as its own separate named roster. Two ways to get there:
 
+**Decision tagging + Commit Split (faster, recommended for deciding who
+goes where):**
+1. On your current live roster, use the small **N / HLLV / HLLWW2** toggle
+   next to every trooper's name (Battalion Roster tree or Drag & Drop) to
+   mark them Neutral (undecided) or assigned to one of the two new
+   battalions. Combine with the name/rank/MOS filter to work through the
+   roster systematically.
+2. Tagging doesn't touch Save/Revert or the Change Log — it's a separate,
+   lightweight decision layer on top of the live roster, so you can leave it
+   half-finished and come back to it.
+3. Click **Commit Split** (Battalion Roster tab) to generate the `HLLV` and
+   `HLLWW2` rosters from the current tags — full company/platoon/squad
+   structure carried over, untagged billets left vacant. Running it again
+   later (as more people get tagged) updates those same two rosters rather
+   than creating duplicates.
+
+**Manual (import company-by-company or trooper-by-trooper):**
 1. Tag your current live roster **Old** via **Rename** (Edit Roster →
    Configuration → Old).
 2. Create a **+ New Roster** per new battalion, tagged **New**.
@@ -197,7 +235,8 @@ Revert Changes to back out before saving.
 to pull in real people, and drag them into place.
 
 **Splitting the battalion into two:** see [Tagging Old vs. New](#tagging-old-vs-new-battalion-split)
-above.
+above — tag each trooper N/HLLV/HLLWW2 and click Commit Split, or do it
+manually with Import Company/Trooper into rosters you create yourself.
 
 **Cleaning up the history:** if a test move or mis-click got saved to the
 Change Log, open the Change Log panel and Delete that specific entry, or

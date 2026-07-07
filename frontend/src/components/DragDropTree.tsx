@@ -1,12 +1,29 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
-import type { Battalion, Company, Platoon, RosterData, Soldier, Squad } from "../types/roster";
+import type { Battalion, Company, Platoon, RosterData, Soldier, SplitStatus, Squad } from "../types/roster";
 import type { ApiRankExpanded } from "../types/api";
-import { moveSoldier, addPlatoon, addSquad, type SlotPath, type SoldierPatch } from "../lib/moveSoldier";
+import {
+  moveSoldier,
+  addPlatoon,
+  addSquad,
+  deletePlatoon,
+  deleteSquad,
+  type SlotPath,
+  type SoldierPatch,
+} from "../lib/moveSoldier";
 import { collectAllSoldiers } from "../lib/analytics";
+import {
+  EMPTY_FILTER,
+  isFilterActive,
+  matchesSoldier,
+  platoonHasMatch,
+  squadHasMatch,
+  type RosterFilter,
+} from "../lib/filterRoster";
 import { SoldierForm, type SoldierFormValues } from "./SoldierForm";
 import { ImportSoldierPicker } from "./ImportSoldierPicker";
 import { ImportCompanyPicker } from "./ImportCompanyPicker";
+import { SplitStatusToggle } from "./SplitStatusToggle";
 import "./RosterTree.css";
 import "./DragDropTree.css";
 
@@ -17,8 +34,12 @@ function slotId(destination: SlotPath): string {
 interface Actions {
   onAddPlatoon: (company: string) => void;
   onAddSquad: (company: string, platoon: string) => void;
+  onDeletePlatoon: (company: string, platoon: string) => void;
+  onDeleteSquad: (company: string, platoon: string, squad: string) => void;
   onRequestEdit: (soldier: Soldier) => void;
   onDeleteSoldier: (userId: string) => void;
+  onSetSplitStatus: (userId: string, status: SplitStatus) => void;
+  filter: RosterFilter;
 }
 
 const ActionsContext = createContext<Actions | null>(null);
@@ -30,21 +51,26 @@ function useActions(): Actions {
 }
 
 function DraggableSoldier({ soldier }: { soldier: Soldier }) {
-  const { onRequestEdit, onDeleteSoldier } = useActions();
+  const { onRequestEdit, onDeleteSoldier, onSetSplitStatus, filter } = useActions();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: soldier.userId,
   });
+  const matched = isFilterActive(filter) && matchesSoldier(soldier, filter);
   return (
     <span className="draggable-soldier-wrapper">
       <span
         ref={setNodeRef}
         {...listeners}
         {...attributes}
-        className={`draggable-soldier${isDragging ? " dragging" : ""}`}
+        className={`draggable-soldier${isDragging ? " dragging" : ""}${matched ? " filter-match" : ""}`}
       >
         {soldier.rankShort} {soldier.realName}
         {soldier.username && <span className="soldier-username"> ({soldier.username})</span>}
       </span>
+      <SplitStatusToggle
+        status={soldier.splitStatus ?? "neutral"}
+        onChange={(next) => onSetSplitStatus(soldier.userId, next)}
+      />
       <button
         type="button"
         className="icon-btn"
@@ -86,6 +112,7 @@ function DroppableSlot({
     id: slotId(destination),
     data: { destination },
   });
+  const { filter } = useActions();
   const className = [
     "drop-slot",
     isOver && occupied ? "drop-blocked" : "",
@@ -95,7 +122,11 @@ function DroppableSlot({
     .join(" ");
   return (
     <span ref={setNodeRef} className={className}>
-      {soldier ? <DraggableSoldier soldier={soldier} /> : <span className="vacant">{emptyLabel}</span>}
+      {soldier ? (
+        <DraggableSoldier soldier={soldier} />
+      ) : (
+        <span className={`vacant${filter.vacantOnly ? " filter-match" : ""}`}>{emptyLabel}</span>
+      )}
     </span>
   );
 }
@@ -132,8 +163,10 @@ function DragDropSquad({
   company: string;
   platoon: string;
 }) {
+  const { onDeleteSquad } = useActions();
   const leaderDest: SlotPath = { kind: "squadLeader", company, platoon, squad: squad.number };
   const memberDest: SlotPath = { kind: "squadMember", company, platoon, squad: squad.number };
+  const isEmpty = squad.leader === null && squad.members.length === 0;
   return (
     <details className="tree-node squad-node" open>
       <summary>
@@ -145,6 +178,18 @@ function DragDropSquad({
           soldier={squad.leader}
         />
         <span className="count-badge">{squad.members.length + (squad.leader ? 1 : 0)}</span>
+        <button
+          type="button"
+          className="icon-btn icon-btn-danger"
+          title={isEmpty ? "Remove this squad" : "Move everyone out first"}
+          disabled={!isEmpty}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteSquad(company, platoon, squad.number);
+          }}
+        >
+          ✕
+        </button>
       </summary>
       <DroppableMemberList destination={memberDest} members={squad.members} />
     </details>
@@ -152,13 +197,20 @@ function DragDropSquad({
 }
 
 function DragDropPlatoon({ platoon, company }: { platoon: Platoon; company: string }) {
-  const { onAddSquad } = useActions();
+  const { onAddSquad, onDeletePlatoon, filter } = useActions();
   const leaderDest: SlotPath = { kind: "platoonLeader", company, platoon: platoon.number };
   const sergeantDest: SlotPath = { kind: "platoonSergeant", company, platoon: platoon.number };
   const total = platoon.squads.reduce(
     (sum, s) => sum + s.members.length + (s.leader ? 1 : 0),
     0,
   );
+  const isEmpty =
+    platoon.leader === null &&
+    platoon.sergeant === null &&
+    platoon.squads.every((s) => s.leader === null && s.members.length === 0);
+  const squads = isFilterActive(filter)
+    ? platoon.squads.filter((s) => squadHasMatch(s, filter))
+    : platoon.squads;
   return (
     <details className="tree-node platoon-node" open>
       <summary>
@@ -177,8 +229,20 @@ function DragDropPlatoon({ platoon, company }: { platoon: Platoon; company: stri
           soldier={platoon.sergeant}
         />
         <span className="count-badge">{total}</span>
+        <button
+          type="button"
+          className="icon-btn icon-btn-danger"
+          title={isEmpty ? "Remove this platoon" : "Move everyone out of it (and its squads) first"}
+          disabled={!isEmpty}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeletePlatoon(company, platoon.number);
+          }}
+        >
+          ✕
+        </button>
       </summary>
-      {platoon.squads.map((squad) => (
+      {squads.map((squad) => (
         <DragDropSquad key={squad.number} squad={squad} company={company} platoon={platoon.number} />
       ))}
       <button className="add-btn" onClick={() => onAddSquad(company, platoon.number)}>
@@ -189,7 +253,7 @@ function DragDropPlatoon({ platoon, company }: { platoon: Platoon; company: stri
 }
 
 function DragDropCompany({ company }: { company: Company }) {
-  const { onAddPlatoon } = useActions();
+  const { onAddPlatoon, filter } = useActions();
   const coDest: SlotPath = { kind: "companyCommander", company: company.letter };
   const xoDest: SlotPath = { kind: "companyXO", company: company.letter };
   const sgtDest: SlotPath = { kind: "company1SG", company: company.letter };
@@ -198,6 +262,9 @@ function DragDropCompany({ company }: { company: Company }) {
       sum + p.squads.reduce((s2, sq) => s2 + sq.members.length + (sq.leader ? 1 : 0), 0),
     0,
   );
+  const platoons = isFilterActive(filter)
+    ? company.platoons.filter((p) => platoonHasMatch(p, filter))
+    : company.platoons;
   return (
     <details className="tree-node company-node" open>
       <summary>
@@ -226,7 +293,7 @@ function DragDropCompany({ company }: { company: Company }) {
           soldier={company.firstSergeant}
         />
       </div>
-      {company.platoons.map((platoon) => (
+      {platoons.map((platoon) => (
         <DragDropPlatoon key={platoon.number} platoon={platoon} company={company.letter} />
       ))}
       <button className="add-btn" onClick={() => onAddPlatoon(company.letter)}>
@@ -307,6 +374,8 @@ export function DragDropTree({
   onDeleteSoldier,
   onImportSoldier,
   onImportCompany,
+  onSetSplitStatus,
+  filter = EMPTY_FILTER,
 }: {
   roster: RosterData;
   rosterId: string;
@@ -318,6 +387,8 @@ export function DragDropTree({
   onDeleteSoldier: (userId: string) => void;
   onImportSoldier: (soldier: Soldier, targetLetter: string) => boolean;
   onImportCompany: (company: Company) => boolean;
+  onSetSplitStatus: (userId: string, status: SplitStatus) => void;
+  filter?: RosterFilter;
 }) {
   const options = paneOptions(roster);
   const [leftLetter, setLeftLetter] = useState(
@@ -377,8 +448,18 @@ export function DragDropTree({
   const actions: Actions = {
     onAddPlatoon: (company) => onChange(addPlatoon(roster, company)),
     onAddSquad: (company, platoon) => onChange(addSquad(roster, company, platoon)),
+    onDeletePlatoon: (company, platoon) => {
+      const result = deletePlatoon(roster, company, platoon);
+      if (result.ok) onChange(result.roster);
+    },
+    onDeleteSquad: (company, platoon, squad) => {
+      const result = deleteSquad(roster, company, platoon, squad);
+      if (result.ok) onChange(result.roster);
+    },
     onRequestEdit: (soldier) => setEditingSoldier(soldier),
     onDeleteSoldier,
+    onSetSplitStatus,
+    filter,
   };
 
   return (

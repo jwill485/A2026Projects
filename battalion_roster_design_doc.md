@@ -68,8 +68,12 @@ re-sort them within their squad.
 
 ### 2.5 Structure Management
 Add companies (short code + name, e.g. `D` / "Dog"), platoons, and squads to
-the active roster. No delete for platoons/squads/companies — an unused empty
-one is harmless and can just be left.
+the active roster. Platoons and squads can also be removed via a small ✕ next
+to their name in Drag & Drop — but only while empty (no leader/sergeant, and
+for a platoon, none of its squads have anyone either); the button is disabled
+with an explanatory tooltip otherwise, so removing one never silently deletes
+troopers. Still no delete for companies — an unused empty one is harmless and
+can just be left.
 
 ### 2.6 Live 7Cav API Import
 Three ways to pull real people into any roster, without ever writing back to
@@ -108,12 +112,28 @@ vacancy report of every open leadership billet.
 2-7 is expected to eventually split into two battalions (working names
 **HLLV** / **HLLWW2**). Rather than a new data-model concept, this is built
 on top of Multiple Named Rosters (§2.1): the live roster stays as-is (tagged
-**Old**), and each new battalion is built out as its own separate roster
-(tagged **New**), populated by breaking down the old companies via Import
-Company/Import Trooper. The Battalion Roster tab shows a colored **"Viewing:
-Old/New Configuration"** badge based on the active roster's tag, so it's
-always clear which one is in view. See [§8.1](#81-battalion-split-2-7--two-battalions)
+**Old**), and each new battalion ends up as its own separate roster (tagged
+**New**). The Battalion Roster tab shows a colored **"Viewing: Old/New
+Configuration"** badge based on the active roster's tag, so it's always
+clear which one is in view. See [§8.1](#81-battalion-split-2-7--two-battalions)
 for the fuller history of this decision.
+
+Two ways to actually populate the new rosters, usable independently or
+together:
+- **Manual**: break down the old companies via Import Company/Import
+  Trooper into a roster you've already created for the new battalion.
+- **Decision tagging + Commit Split**: every trooper gets a small **N /
+  HLLV / HLLWW2** toggle (next to their name on both the Battalion Roster
+  tree and Drag & Drop) to mark them Neutral (undecided) or assigned to one
+  of the two new battalions — right on the *existing* live roster, so you
+  can see who's still undecided as you go (pairs naturally with the
+  **Vacant leadership only**-style filtering in [§2.12](#212-search--filter)).
+  Tagging doesn't count as a "pending change" (it's not part of
+  `diffRosters`), so it never blocks Save/Org Chart/etc. Once decided,
+  **Commit Split** reads every tag and generates (or, if run again,
+  overwrites) the two `HLLV`/`HLLWW2` rosters — full company/platoon/squad
+  structure carried over, with untagged slots left vacant so the shape of
+  each new battalion is visible even before every billet is decided.
 
 ### 2.10 Org Chart View
 On the Battalion Roster tab, **Generate Org Chart** swaps the text tree for a
@@ -123,7 +143,35 @@ charting library, consistent with the hand-built `Charts.tsx`. The button is
 disabled whenever there are unsaved changes (same pending-change check as
 Save/Revert), so the chart always reflects a saved/settled state rather than
 a mid-edit one; clicking **Hide Org Chart** returns to the tree view. Scrolls
-horizontally for battalions too wide to fit on screen.
+horizontally for battalions too wide to fit on screen. Squad member rosters
+stay collapsed by default (just the leader shown) with a per-squad **Show N
+members** toggle plus **Expand All**/**Collapse All** controls, to keep large
+battalions readable.
+
+### 2.11 Roster List / Print View
+Also on the Battalion Roster tab, **Print Roster** swaps the tree for a flat,
+indented list of the whole battalion — one line per billet (Battalion HQ →
+Company → Platoon → Squad → members) reading `Position: Rank Name` — in
+`RosterListView.tsx`. Unlike the Org Chart, it isn't gated on saved state; it
+just reflects whatever's currently in the active roster. It's print-friendly:
+opening the view adds a class to `<html>` that a `@media print` rule keys off
+of to hide the nav/tabs/buttons, so printing (or Save as PDF) from the
+browser produces a clean battalion roster page rather than the app chrome.
+Clicking **Hide Roster List** returns to the tree view.
+
+### 2.12 Search & Filter
+A filter bar (`RosterFilterBar.tsx`) sits above both the Battalion Roster
+and Drag & Drop tabs, sharing one filter state across them: a name search
+box, a **Rank** dropdown and a **MOS** dropdown (both fixed lists — rank
+from the same master rank list used everywhere else, MOS from the distinct
+values actually present in the active roster — rather than free-text typing),
+and a **Vacant leadership only** toggle. Matching troopers/vacant slots are
+highlighted; companies, platoons, and squads with no match anywhere inside
+them are hidden entirely rather than just collapsed, since every tree node
+in this app is always expanded by default. Filtering is purely visual —
+it never restricts what you can drag/drop or edit, and clearing it (via
+**Clear filter**, shown only while a filter is active) instantly restores
+the full tree.
 
 ---
 
@@ -140,6 +188,7 @@ interface Soldier {
   positionTitle: string; // raw 7Cav position title, if imported
   mos: string;
   originLabel?: string;  // billet label at import time; unset if hand-created
+  splitStatus?: "neutral" | "hllv" | "hllww2"; // battalion-split decision tag; unset = neutral
 }
 
 interface Squad {
@@ -371,9 +420,11 @@ single roster holding multiple battalions/groups at once). Built instead on
 top of Multiple Named Rosters (§2.1/§2.9) rather than restructuring
 `RosterData` — no data-model change needed, since every roster already has
 exactly one battalion, which is precisely what each split-off battalion is.
-The supporting tooling (tagging, badge, whole-company import) is done; the
-actual reorg work (deciding and dragging who goes where) is ongoing,
-separate work using that tooling.
+The supporting tooling (roster tagging/badge, whole-company import, the
+per-trooper N/HLLV/HLLWW2 decision tag, and **Commit Split** to generate
+the two new rosters from those tags — see §2.9) is done; the actual reorg
+work (deciding who goes where) is ongoing, separate work using that
+tooling.
 
 Built on a separate git branch (`battalion-split`), per the original decision
 to keep `master` stable while this was worked out.
@@ -387,11 +438,11 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 
 ### 8.3 Other Not-Yet-Built Ideas
 
-- **Search & filter:** find troopers by name/rank/MOS; filter the tree by
-  company/vacancy status.
-- **Export/report:** generate a text/PDF roster (full battalion, per-company,
-  officer/NCO-only). Today the only "export" is copying a Change Log entry
-  as text.
+- **Export/report:** *(Partially built)* [§2.11](#211-roster-list--print-view)
+  covers a whole-battalion list view with browser print/Save-as-PDF support.
+  Still missing: a per-company or officer/NCO-only filtered view, and any
+  export that doesn't go through the browser's own print dialog (e.g. a
+  direct file download).
 - **Rank/MOS validation:** flag rank-inappropriate or MOS-mismatched billet
   assignments.
 - **Attendance/leave tracking:** present/absent for formations, leave toggles.
@@ -441,11 +492,14 @@ FastAPI, frontend `npm install`/`npm run dev`) and a full feature walkthrough.
 
 Repo layout:
 - `backend/app/main.py` — the FastAPI proxy (three read-only endpoints).
-- `frontend/src/lib/` — pure data logic: `buildRoster.ts` (live-API → 
-  `RosterData`), `moveSoldier.ts` (all mutations), `persistence.ts`
-  (localStorage), `changelog.ts`, `analytics.ts`.
-- `frontend/src/components/` — UI: `RosterTree`/`DragDropTree`/`OrgChart`
-  (the three roster views), `RosterPicker`, `SoldierForm`,
+- `frontend/src/lib/` — pure data logic: `buildRoster.ts` (live-API →
+  `RosterData`), `moveSoldier.ts` (all mutations, including the split-status
+  patch), `splitReorg.ts` (Commit Split roster generation), `filterRoster.ts`
+  (search/filter matching), `persistence.ts` (localStorage), `changelog.ts`,
+  `analytics.ts`.
+- `frontend/src/components/` — UI: `RosterTree`/`DragDropTree`/`OrgChart`/
+  `RosterListView` (the four roster views), `RosterFilterBar`,
+  `SplitStatusToggle`, `RosterPicker`, `SoldierForm`,
   `ImportSoldierPicker`/`ImportCompanyPicker`, `AnalyticsTab`, `ChangeLogPanel`.
 
 ---

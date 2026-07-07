@@ -229,6 +229,41 @@ export function addSquad(roster: RosterData, companyLetter: string, platoonNumbe
   return clone;
 }
 
+function isSquadEmpty(squad: { leader: Soldier | null; members: Soldier[] }): boolean {
+  return !squad.leader && squad.members.length === 0;
+}
+
+export function deleteSquad(
+  roster: RosterData,
+  companyLetter: string,
+  platoonNumber: string,
+  squadNumber: string,
+): { roster: RosterData; ok: boolean } {
+  const company = findCompany(roster, companyLetter);
+  const platoon = company && findPlatoon(company, platoonNumber);
+  const squad = platoon && findSquad(platoon, squadNumber);
+  if (!squad || !isSquadEmpty(squad)) return { roster, ok: false };
+  const clone = structuredClone(roster);
+  const cloneCompany = findCompany(clone, companyLetter)!;
+  const clonePlatoon = findPlatoon(cloneCompany, platoonNumber)!;
+  clonePlatoon.squads = clonePlatoon.squads.filter((s) => s.number !== squadNumber);
+  return { roster: clone, ok: true };
+}
+
+export function deletePlatoon(
+  roster: RosterData,
+  companyLetter: string,
+  platoonNumber: string,
+): { roster: RosterData; ok: boolean } {
+  const company = findCompany(roster, companyLetter);
+  const platoon = company && findPlatoon(company, platoonNumber);
+  if (!platoon || !isPlatoonEmpty(platoon)) return { roster, ok: false };
+  const clone = structuredClone(roster);
+  const cloneCompany = findCompany(clone, companyLetter)!;
+  cloneCompany.platoons = cloneCompany.platoons.filter((p) => p.number !== platoonNumber);
+  return { roster: clone, ok: true };
+}
+
 export function addSoldierToCompany(roster: RosterData, letter: string, soldier: Soldier): RosterData {
   const clone = structuredClone(roster);
   const company = findCompany(clone, letter) ?? clone.unassigned;
@@ -371,7 +406,7 @@ function updateInCompany(
 }
 
 export type SoldierPatch = Partial<
-  Pick<Soldier, "realName" | "rankId" | "rankShort" | "rankFull" | "mos">
+  Pick<Soldier, "realName" | "rankId" | "rankShort" | "rankFull" | "mos" | "splitStatus">
 >;
 
 export function updateSoldier(roster: RosterData, userId: string, patch: SoldierPatch): RosterData {

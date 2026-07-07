@@ -18,3 +18,5 @@ build/
 
 # Claude Code local settings (personal, may contain sensitive command history)
 .claude/settings.local.json
+
+notes.txt

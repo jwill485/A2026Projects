@@ -62,6 +62,13 @@
   font-style: italic;
 }
 
+.filter-match {
+  background: #4a3f0f;
+  outline: 1px solid #ffc72c;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
 .count-badge {
   margin-left: 0.6rem;
   padding: 0.05rem 0.5rem;

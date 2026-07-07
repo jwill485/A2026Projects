@@ -1,3 +1,8 @@
+// Battalion-split decision tag: which of the two new battalions (working
+// names HLLV/HLLWW2) a trooper is currently slated for, or "neutral" if
+// undecided. Unset is treated the same as "neutral" everywhere it's read.
+export type SplitStatus = "neutral" | "hllv" | "hllww2";
+
 export interface Soldier {
   userId: string;
   username: string;
@@ -9,6 +14,7 @@ export interface Soldier {
   mos: string;
   // Billet label at time of import from the live roster; unset for manually-created soldiers.
   originLabel?: string;
+  splitStatus?: SplitStatus;
 }
 
 export interface Squad {
