@@ -60,6 +60,14 @@ Dragging a trooper onto an occupied billet is **blocked** (no swap/bump) —
 move or remove the current occupant first. Troopers show small ✎ (edit) and
 ✕ (delete) affordances alongside their name.
 
+A squad can also be dragged as a whole unit via its **⠿ Squad N** handle in
+the summary line, dropped onto any platoon's **squad-list drop zone** (a
+persistent "Drop a squad here" strip below that platoon's squads, since the
+gaps between existing squad cards are too thin to reliably target). Moves
+the leader and every member together; if the destination platoon already
+has a squad using that number, the incoming one is auto-renumbered (same
+next-available scheme as **+ Add Squad**) rather than colliding.
+
 ### 2.4 Trooper Management
 Add, edit, and delete troopers directly (name, rank — selected from the
 7Cav rank list, MOS). New troopers land in the **Building** pane. Editing
@@ -365,6 +373,17 @@ Save Changes / Revert Changes operate on a separate baseline snapshot
 - **Playwright E2E quirk:** the default 720px viewport height puts
   drag targets off-screen, causing false-negative drag failures unrelated to
   app behavior — tests use a tall (`2000px`) viewport instead.
+- **dnd-kit ids must be unique per rendered instance, not per entity:**
+  every `useDraggable`/`useDroppable` id is a React `useId()`, not the
+  trooper's `userId` or a `JSON.stringify`'d destination. The real target
+  travels via each hook's `data` field instead. This matters because the
+  same person/billet can be on screen twice at once — both Drag & Drop
+  panes pointed at the same company (§2.3, a documented supported case) or
+  a freshly-committed split roster where both panes default to the same
+  empty-battalion Unassigned pool (§2.9 phase 3) — and dnd-kit silently
+  drops the drag (resolves `over` to nothing) when two elements share an id
+  rather than erroring, so this class of bug produces no console error, just
+  a drag that mysteriously does nothing.
 
 ### 6.4 External Data Source: 7Cav MILPACS API
 
@@ -462,6 +481,11 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 
 ### 8.3 Other Not-Yet-Built Ideas
 
+- **Bulk-import split tags from a file:** upload a CSV/spreadsheet mapping
+  trooper → N/HLLV/HLLWW2 to bulk-apply split-status tags (§2.9 phase 1),
+  instead of clicking the toggle one person at a time — useful if the
+  sorting decision gets made offline (e.g. in a spreadsheet) rather than
+  live in the app.
 - **Export/report:** *(Partially built)* [§2.11](#211-roster-list--print-view)
   covers a whole-battalion list view with browser print/Save-as-PDF support.
   Still missing: a per-company or officer/NCO-only filtered view, and any
@@ -469,7 +493,6 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
   direct file download).
 - **Rank/MOS validation:** flag rank-inappropriate or MOS-mismatched billet
   assignments.
-- **Attendance/leave tracking:** present/absent for formations, leave toggles.
 - **Notes/flags:** per-trooper notes (medical, discipline, promotion review).
 - **Multi-user auth:** role-based access if this ever needs to be shared
   rather than run locally by one person (see §6.5).

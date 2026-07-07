@@ -344,14 +344,14 @@ function App() {
           onDelete={handleDeleteRoster}
         />
         <div className="tab-group">
+          <button className={tab === "split" ? "active" : ""} onClick={() => setTab("split")}>
+            Split Planner
+          </button>
           <button className={tab === "roster" ? "active" : ""} onClick={() => setTab("roster")}>
             Battalion Roster
           </button>
           <button className={tab === "dragdrop" ? "active" : ""} onClick={() => setTab("dragdrop")}>
             Drag &amp; Drop
-          </button>
-          <button className={tab === "split" ? "active" : ""} onClick={() => setTab("split")}>
-            Split Planner
           </button>
           <button
             className={tab === "analytics" ? "active" : ""}

@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import type { Battalion, Company, Platoon, RosterData, Soldier, SplitStatus, Squad } from "../types/roster";
 import type { ApiRankExpanded } from "../types/api";
 import {
   moveSoldier,
+  moveSquad,
   addPlatoon,
   addSquad,
   deletePlatoon,
@@ -27,10 +28,6 @@ import { SplitStatusToggle } from "./SplitStatusToggle";
 import "./RosterTree.css";
 import "./DragDropTree.css";
 
-function slotId(destination: SlotPath): string {
-  return JSON.stringify(destination);
-}
-
 interface Actions {
   onAddPlatoon: (company: string) => void;
   onAddSquad: (company: string, platoon: string) => void;
@@ -52,8 +49,14 @@ function useActions(): Actions {
 
 function DraggableSoldier({ soldier }: { soldier: Soldier }) {
   const { onRequestEdit, onDeleteSoldier, onSetSplitStatus, filter } = useActions();
+  // A unique per-instance id, not soldier.userId: the same person can be
+  // rendered twice at once (both panes pointed at the same company/pool,
+  // which is the default with zero companies) — dnd-kit requires unique
+  // draggable ids, so the real id travels via `data` instead.
+  const dragId = useId();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: soldier.userId,
+    id: dragId,
+    data: { kind: "soldier", userId: soldier.userId },
   });
   const matched = isFilterActive(filter) && matchesSoldier(soldier, filter);
   return (
@@ -110,8 +113,13 @@ function DroppableSlot({
   emptyLabel: string;
   soldier: Soldier | null;
 }) {
+  // A unique per-instance id, not slotId(destination): the same billet can
+  // be rendered twice at once (both panes pointed at the same company),
+  // and dnd-kit requires unique droppable ids too — the real target travels
+  // via `data` instead.
+  const dropId = useId();
   const { setNodeRef, isOver } = useDroppable({
-    id: slotId(destination),
+    id: dropId,
     data: { destination },
   });
   const { filter } = useActions();
@@ -140,8 +148,9 @@ function DroppableMemberList({
   destination: SlotPath;
   members: Soldier[];
 }) {
+  const dropId = useId();
   const { setNodeRef, isOver } = useDroppable({
-    id: slotId(destination),
+    id: dropId,
     data: { destination },
   });
   return (
@@ -153,6 +162,33 @@ function DroppableMemberList({
       ))}
       {members.length === 0 && <li className="vacant">Drop troopers here</li>}
     </ul>
+  );
+}
+
+function SquadDragHandle({
+  company,
+  platoon,
+  squadNumber,
+}: {
+  company: string;
+  platoon: string;
+  squadNumber: string;
+}) {
+  const dragId = useId();
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: dragId,
+    data: { kind: "squad", company, platoon, squadNumber },
+  });
+  return (
+    <span
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`squad-drag-handle${isDragging ? " dragging" : ""}`}
+      title="Drag to move the whole squad to another platoon"
+    >
+      ⠿ Squad {squadNumber}
+    </span>
   );
 }
 
@@ -172,7 +208,7 @@ function DragDropSquad({
   return (
     <details className="tree-node squad-node" open>
       <summary>
-        Squad {squad.number} — Leader:{" "}
+        <SquadDragHandle company={company} platoon={platoon} squadNumber={squad.number} /> — Leader:{" "}
         <DroppableSlot
           destination={leaderDest}
           occupied={squad.leader !== null}
@@ -195,6 +231,31 @@ function DragDropSquad({
       </summary>
       <DroppableMemberList destination={memberDest} members={squad.members} />
     </details>
+  );
+}
+
+function DroppableSquadList({
+  company,
+  platoon,
+  children,
+}: {
+  company: string;
+  platoon: string;
+  children: ReactNode;
+}) {
+  const dropId = useId();
+  const { setNodeRef, isOver } = useDroppable({
+    id: dropId,
+    data: { kind: "platoonSquadList", company, platoon },
+  });
+  return (
+    <div ref={setNodeRef} className={`squad-list-drop-zone${isOver ? " drop-ok" : ""}`}>
+      {children}
+      {/* A persistent, always-visible target: the gaps between existing
+          squad cards are too thin to reliably hit, and this platoon might
+          have no squads yet at all. */}
+      <div className="squad-drop-hint">⠿ Drop a squad here to move it into Platoon {platoon}</div>
+    </div>
   );
 }
 
@@ -244,9 +305,11 @@ function DragDropPlatoon({ platoon, company }: { platoon: Platoon; company: stri
           ✕
         </button>
       </summary>
-      {squads.map((squad) => (
-        <DragDropSquad key={squad.number} squad={squad} company={company} platoon={platoon.number} />
-      ))}
+      <DroppableSquadList company={company} platoon={platoon.number}>
+        {squads.map((squad) => (
+          <DragDropSquad key={squad.number} squad={squad} company={company} platoon={platoon.number} />
+        ))}
+      </DroppableSquadList>
       <button className="add-btn" onClick={() => onAddSquad(company, platoon.number)}>
         + Add Squad
       </button>
@@ -425,9 +488,24 @@ export function DragDropTree({
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over) return;
-    const destination = over.data.current?.destination as SlotPath | undefined;
+    const activeData = active.data.current;
+    const overData = over.data.current;
+
+    if (activeData?.kind === "squad") {
+      if (overData?.kind !== "platoonSquadList") return;
+      const result = moveSquad(
+        roster,
+        { company: activeData.company, platoon: activeData.platoon, squad: activeData.squadNumber },
+        { company: overData.company, platoon: overData.platoon },
+      );
+      if (result.ok) onChange(result.roster);
+      return;
+    }
+
+    const destination = overData?.destination as SlotPath | undefined;
     if (!destination) return;
-    const userId = String(active.id);
+    const userId = activeData?.userId as string | undefined;
+    if (!userId) return;
     const result = moveSoldier(roster, userId, destination);
     if (result.ok) onChange(result.roster);
   }

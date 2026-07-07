@@ -141,6 +141,12 @@ pane instead of two.
   member list) in either pane, and release. Occupied billets are
   **blocked** — you can't drop onto a slot that already has someone in it;
   move or remove the current occupant first.
+- **Dragging a whole squad**: click and hold the **⠿ Squad N** handle in a
+  squad's summary line (next to its Leader) and drop it on the dashed
+  **"Drop a squad here"** strip below any platoon's squad list — moves the
+  leader and every member together in one action. If that platoon already
+  has a squad with the same number, the incoming one is automatically
+  renumbered rather than colliding.
 - **✎ (edit)** next to a trooper's name — opens a form to change their name,
   rank, or MOS without moving them.
   **✕ (delete)** — removes them from the roster entirely (with confirmation).

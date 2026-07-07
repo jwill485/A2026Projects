@@ -264,6 +264,44 @@ export function deletePlatoon(
   return { roster: clone, ok: true };
 }
 
+export interface SquadLocation {
+  company: string;
+  platoon: string;
+  squad: string;
+}
+
+// Moves an entire squad (leader + members) to a different platoon in one
+// step, instead of dragging each trooper individually — handy for reorgs
+// and the split's build phase. If the destination platoon already has a
+// squad using the same number, the incoming squad is renumbered (same
+// next-available scheme as addSquad) rather than colliding with it.
+export function moveSquad(
+  roster: RosterData,
+  source: SquadLocation,
+  destination: { company: string; platoon: string },
+): { roster: RosterData; ok: boolean } {
+  const srcCompany = findCompany(roster, source.company);
+  const srcPlatoon = srcCompany && findPlatoon(srcCompany, source.platoon);
+  const squad = srcPlatoon && findSquad(srcPlatoon, source.squad);
+  const destCompany = findCompany(roster, destination.company);
+  const destPlatoon = destCompany && findPlatoon(destCompany, destination.platoon);
+  if (!squad || !destPlatoon) return { roster, ok: false };
+
+  const clone = structuredClone(roster);
+  const cSrcPlatoon = findPlatoon(findCompany(clone, source.company)!, source.platoon)!;
+  const index = cSrcPlatoon.squads.findIndex((s) => s.number === source.squad);
+  const [moved] = cSrcPlatoon.squads.splice(index, 1);
+
+  const cDestPlatoon = findPlatoon(findCompany(clone, destination.company)!, destination.platoon)!;
+  if (cDestPlatoon.squads.some((s) => s.number === moved.number)) {
+    moved.number = String(
+      cDestPlatoon.squads.reduce((max, s) => Math.max(max, Number(s.number)), 0) + 1,
+    );
+  }
+  cDestPlatoon.squads.push(moved);
+  return { roster: clone, ok: true };
+}
+
 export function addSoldierToCompany(roster: RosterData, letter: string, soldier: Soldier): RosterData {
   const clone = structuredClone(roster);
   const company = findCompany(clone, letter) ?? clone.unassigned;

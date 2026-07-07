@@ -68,6 +68,45 @@
   cursor: not-allowed;
 }
 
+.squad-drag-handle {
+  cursor: grab;
+  color: #ccc;
+  font-weight: 600;
+}
+
+.squad-drag-handle:active {
+  cursor: grabbing;
+}
+
+.squad-drag-handle.dragging {
+  opacity: 0.4;
+}
+
+.squad-list-drop-zone {
+  border-radius: 6px;
+  outline: 2px dashed transparent;
+  outline-offset: 2px;
+}
+
+.squad-list-drop-zone.drop-ok {
+  outline-color: #4caf50;
+}
+
+.squad-drop-hint {
+  margin: 0.3rem 0 0.3rem 1.5rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px dashed #444;
+  border-radius: 6px;
+  color: #666;
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+.squad-list-drop-zone.drop-ok .squad-drop-hint {
+  border-color: #4caf50;
+  color: #7fce7f;
+}
+
 ul.drop-slot {
   display: block;
   min-height: 1.5rem;

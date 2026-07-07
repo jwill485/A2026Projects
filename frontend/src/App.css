@@ -169,6 +169,9 @@
   place-content: center;
   place-items: center;
   flex-grow: 1;
+  /* #center is capped at a max-width narrower than #root, so without this
+     it sits flush against #root's left edge instead of centered in it. */
+  margin: 0 auto;
 
   @media (max-width: 1024px) {
     padding: 32px 20px 24px;
