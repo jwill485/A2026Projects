@@ -68,6 +68,38 @@
   cursor: not-allowed;
 }
 
+/* Vacant billets are buttons: click opens the candidate picker (dragging
+   onto them still works — the button sits inside the droppable). */
+.vacant-slot-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed #8a5a4a;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.vacant-slot-btn:hover {
+  color: #ffc72c;
+  border-bottom-color: #ffc72c;
+}
+
+.assign-member-btn {
+  background: transparent;
+  border: 1px dashed #444;
+  border-radius: 4px;
+  color: #777;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.05rem 0.45rem;
+}
+
+.assign-member-btn:hover {
+  color: #ffc72c;
+  border-color: #ffc72c;
+}
+
 .squad-drag-handle {
   cursor: grab;
   color: #ccc;

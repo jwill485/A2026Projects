@@ -105,7 +105,9 @@ function removeFromCompany(company: Company, userId: string): Soldier | null {
   return null;
 }
 
-function removeSoldier(roster: RosterData, userId: string): Soldier | null {
+// Exported for buildSuggestions.ts, which pulls people out of the pool (or
+// wherever they sit) while materializing a suggested structure.
+export function removeSoldier(roster: RosterData, userId: string): Soldier | null {
   if (roster.battalion.commander?.userId === userId) {
     const soldier = roster.battalion.commander;
     roster.battalion.commander = null;
@@ -300,6 +302,23 @@ export function moveSquad(
   }
   cDestPlatoon.squads.push(moved);
   return { roster: clone, ok: true };
+}
+
+// Planning metadata, not a structural move — see Squad.practiceTime. An
+// empty/blank time clears the field back to unset.
+export function setSquadPracticeTime(
+  roster: RosterData,
+  location: SquadLocation,
+  practiceTime: string,
+): RosterData {
+  const clone = structuredClone(roster);
+  const company = findCompany(clone, location.company);
+  const platoon = company && findPlatoon(company, location.platoon);
+  const squad = platoon && findSquad(platoon, location.squad);
+  if (!squad) return roster;
+  if (practiceTime.trim() === "") delete squad.practiceTime;
+  else squad.practiceTime = practiceTime;
+  return clone;
 }
 
 export function addSoldierToCompany(roster: RosterData, letter: string, soldier: Soldier): RosterData {

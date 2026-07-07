@@ -1,4 +1,4 @@
-import type { Company, RosterData, Soldier } from "../types/roster";
+import type { Company, RosterData, Soldier, Squad } from "../types/roster";
 
 export interface FillStat {
   label: string;
@@ -41,6 +41,20 @@ export function collectAllSoldiers(roster: RosterData): Soldier[] {
   }
   soldiers.push(...collectCompanySoldiers(roster.unassigned));
   return soldiers;
+}
+
+// MOS makeup of one squad (leader + members), most common first — shown per
+// squad on the Split Planner's practice-times phase.
+export function computeSquadMos(squad: Squad): CountStat[] {
+  const counts = new Map<string, number>();
+  const everyone = [...(squad.leader ? [squad.leader] : []), ...squad.members];
+  for (const soldier of everyone) {
+    const mos = soldier.mos.trim() === "" ? "No MOS" : soldier.mos;
+    counts.set(mos, (counts.get(mos) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label, value]) => ({ label, value }));
 }
 
 export function computeLeadershipFillByCompany(roster: RosterData): FillStat[] {

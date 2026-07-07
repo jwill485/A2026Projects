@@ -25,6 +25,7 @@ import { SoldierForm, type SoldierFormValues } from "./SoldierForm";
 import { ImportSoldierPicker } from "./ImportSoldierPicker";
 import { ImportCompanyPicker } from "./ImportCompanyPicker";
 import { SplitStatusToggle } from "./SplitStatusToggle";
+import { CandidatePicker } from "./CandidatePicker";
 import "./RosterTree.css";
 import "./DragDropTree.css";
 
@@ -36,6 +37,7 @@ interface Actions {
   onRequestEdit: (soldier: Soldier) => void;
   onDeleteSoldier: (userId: string) => void;
   onSetSplitStatus?: (userId: string, status: SplitStatus) => void;
+  onRequestAssign: (destination: SlotPath) => void;
   filter: RosterFilter;
 }
 
@@ -122,7 +124,7 @@ function DroppableSlot({
     id: dropId,
     data: { destination },
   });
-  const { filter } = useActions();
+  const { filter, onRequestAssign } = useActions();
   const className = [
     "drop-slot",
     isOver && occupied ? "drop-blocked" : "",
@@ -135,7 +137,14 @@ function DroppableSlot({
       {soldier ? (
         <DraggableSoldier soldier={soldier} />
       ) : (
-        <span className={`vacant${filter.vacantOnly ? " filter-match" : ""}`}>{emptyLabel}</span>
+        <button
+          type="button"
+          className={`vacant vacant-slot-btn${filter.vacantOnly ? " filter-match" : ""}`}
+          title="Click to pick someone for this billet (or drag a trooper here)"
+          onClick={() => onRequestAssign(destination)}
+        >
+          {emptyLabel}
+        </button>
       )}
     </span>
   );
@@ -153,6 +162,7 @@ function DroppableMemberList({
     id: dropId,
     data: { destination },
   });
+  const { onRequestAssign } = useActions();
   return (
     <ul ref={setNodeRef} className={`member-list drop-slot${isOver ? " drop-ok" : ""}`}>
       {members.map((member) => (
@@ -160,7 +170,16 @@ function DroppableMemberList({
           <DraggableSoldier soldier={member} />
         </li>
       ))}
-      {members.length === 0 && <li className="vacant">Drop troopers here</li>}
+      <li>
+        <button
+          type="button"
+          className="assign-member-btn"
+          title="Pick a trooper for this squad from a list"
+          onClick={() => onRequestAssign(destination)}
+        >
+          + assign trooper
+        </button>
+      </li>
     </ul>
   );
 }
@@ -462,6 +481,7 @@ export function DragDropTree({
   const [creatingSoldier, setCreatingSoldier] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importingCompany, setImportingCompany] = useState(false);
+  const [assigning, setAssigning] = useState<SlotPath | null>(null);
   const [newCompanyLetter, setNewCompanyLetter] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
 
@@ -537,6 +557,7 @@ export function DragDropTree({
     onRequestEdit: (soldier) => setEditingSoldier(soldier),
     onDeleteSoldier,
     onSetSplitStatus,
+    onRequestAssign: setAssigning,
     filter,
   };
 
@@ -638,6 +659,19 @@ export function DragDropTree({
           existingLetters={new Set([...roster.battalion.companies.map((c) => c.letter), roster.unassigned.letter])}
           onImport={onImportCompany}
           onClose={() => setImportingCompany(false)}
+        />
+      )}
+      {assigning && (
+        <CandidatePicker
+          roster={roster}
+          ranks={ranks}
+          destination={assigning}
+          onAssign={(userId) => {
+            const result = moveSoldier(roster, userId, assigning);
+            if (result.ok) onChange(result.roster);
+            setAssigning(null);
+          }}
+          onClose={() => setAssigning(null)}
         />
       )}
     </ActionsContext.Provider>

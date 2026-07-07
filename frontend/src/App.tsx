@@ -8,10 +8,13 @@ import {
   addSoldierToUnassigned,
   deleteSoldier,
   importCompany,
+  setSquadPracticeTime,
   updateSoldier,
   type SoldierPatch,
+  type SquadLocation,
 } from "./lib/moveSoldier";
-import { collectAllSoldiers } from "./lib/analytics";
+import { collectAllSoldiers, collectCompanySoldiers } from "./lib/analytics";
+import { applySuggestedCompanies, type SuggestedCompany } from "./lib/buildSuggestions";
 import { diffRosters } from "./lib/changelog";
 import {
   listRosters,
@@ -45,6 +48,7 @@ import { RosterFilterBar } from "./components/RosterFilterBar";
 import { EMPTY_FILTER, type RosterFilter } from "./lib/filterRoster";
 import { buildSplitRoster, SPLIT_GROUPS } from "./lib/splitReorg";
 import { applySplitTags, type SplitTagImportResult, type SplitTagRow } from "./lib/splitTagImport";
+import { fillDefaultPracticeTimes } from "./lib/practiceDefaults";
 import { SplitPlanner } from "./components/SplitPlanner";
 import type { Company, RosterData, Soldier, SplitStatus } from "./types/roster";
 import type { ApiRankExpanded } from "./types/api";
@@ -188,14 +192,101 @@ function App() {
 
   function handleSetSplitStatus(userId: string, status: SplitStatus) {
     if (!roster) return;
-    handleChange(updateSoldier(roster, userId, { splitStatus: status }));
+    // Changing who goes where invalidates an earlier leadership sign-off.
+    handleChange({ ...updateSoldier(roster, userId, { splitStatus: status }), leadershipAccepted: false });
   }
 
   function handleImportSplitTags(rows: SplitTagRow[]): SplitTagImportResult | null {
     if (!roster) return null;
     const result = applySplitTags(roster, rows);
-    if (result.applied > 0) handleChange(result.roster);
+    if (result.applied > 0) handleChange({ ...result.roster, leadershipAccepted: false });
     return result;
+  }
+
+  function handleSetPracticeTime(location: SquadLocation, time: string) {
+    if (!roster) return;
+    // Editing a time means the set is no longer signed off until saved again.
+    handleChange({ ...setSquadPracticeTime(roster, location, time), practiceTimesConfirmed: false });
+  }
+
+  // "Accept current practice times": fill every blank with the known real
+  // schedule (practiceDefaults.ts) and sign the set off in one click.
+  function handleAcceptPracticeTimes() {
+    if (!roster) return;
+    handleChange({ ...fillDefaultPracticeTimes(roster), practiceTimesConfirmed: true });
+  }
+
+  // Opening the editor pre-fills blanks with the same defaults so the table
+  // starts from the real schedule, but doesn't sign anything off.
+  function handleBeginEditPracticeTimes() {
+    if (!roster) return;
+    handleChange(fillDefaultPracticeTimes(roster));
+  }
+
+  function handleSavePracticeTimes() {
+    if (!roster) return;
+    handleChange({ ...roster, practiceTimesConfirmed: true });
+  }
+
+  function handleAcceptLeadership() {
+    if (!roster) return;
+    handleChange({ ...roster, leadershipAccepted: true });
+  }
+
+  // "Send Charlie to HLLV intact": tags all of C's members HLLV immediately
+  // (so the sort counts and leadership review reflect it) and sets the flag
+  // Commit reads to carry the whole company over. Composition changed either
+  // way, so the leadership sign-off resets.
+  function handleSetCharlieToHllv(enabled: boolean) {
+    if (!roster) return;
+    const next = structuredClone(roster);
+    next.sendCharlieToHllv = enabled;
+    next.leadershipAccepted = false;
+    if (enabled) {
+      const charlie = next.battalion.companies.find((c) => c.letter === "C");
+      if (charlie) {
+        for (const soldier of collectCompanySoldiers(charlie)) soldier.splitStatus = "hllv";
+      }
+    }
+    handleChange(next);
+  }
+
+  // Applies a suggested structure to a committed battalion roster (which may
+  // or may not be the active one). Saved but not baselined, so opening that
+  // roster shows the result as reviewable pending changes.
+  function handleApplySuggestion(targetId: string, suggestions: SuggestedCompany[]) {
+    const data = loadRoster(targetId);
+    if (!data) return;
+    const applied = applySuggestedCompanies(data, suggestions);
+    saveRoster(targetId, applied);
+    if (targetId === rosterId) setRoster(applied);
+    // The target usually isn't the active roster, so nothing else re-renders
+    // the planner's per-battalion stats — nudge the roster list to refresh.
+    touchRoster(targetId);
+    setRosterList(listRosters());
+    window.alert(
+      "Suggested structure applied — squads are placed, leadership billets are left for you to fill. " +
+        "Open the roster to review; Revert Changes undoes it.",
+    );
+  }
+
+  // Test helper for playing with the split's later phases without sorting
+  // for real: coin-flips every trooper onto HLLV or HLLWW2.
+  function handleRandomizeSplitTags() {
+    if (!roster) return;
+    if (
+      !window.confirm(
+        "Randomly tag every trooper HLLV or HLLWW2? This overwrites all current split tags (Revert Changes can't undo it, but re-tagging or re-importing can).",
+      )
+    ) {
+      return;
+    }
+    const clone = structuredClone(roster);
+    for (const soldier of collectAllSoldiers(clone)) {
+      soldier.splitStatus = Math.random() < 0.5 ? "hllv" : "hllww2";
+    }
+    clone.leadershipAccepted = false;
+    handleChange(clone);
   }
 
   function handleCommitSplit() {
@@ -210,7 +301,7 @@ function App() {
       return;
     }
     for (const { name, status } of SPLIT_GROUPS) {
-      const built = buildSplitRoster(roster, status, name, rankOrder ?? undefined);
+      const built = buildSplitRoster(roster, status, name, rankOrder ?? undefined, roster.sendCharlieToHllv ?? false);
       const existing = rosterList.find((r) => r.name === name);
       if (existing) {
         saveRoster(existing.id, built);
@@ -473,6 +564,14 @@ function App() {
           onOpenRoster={handleOpenRosterBuild}
           onStartSorting={handleStartSorting}
           onImportSplitTags={handleImportSplitTags}
+          onRandomizeSplitTags={handleRandomizeSplitTags}
+          onSetPracticeTime={handleSetPracticeTime}
+          onAcceptPracticeTimes={handleAcceptPracticeTimes}
+          onBeginEditPracticeTimes={handleBeginEditPracticeTimes}
+          onSavePracticeTimes={handleSavePracticeTimes}
+          onAcceptLeadership={handleAcceptLeadership}
+          onSetCharlieToHllv={handleSetCharlieToHllv}
+          onApplySuggestion={handleApplySuggestion}
         />
       )}
       {tab === "analytics" && <AnalyticsTab roster={roster} />}

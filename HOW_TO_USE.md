@@ -144,11 +144,19 @@ Unassigned pool) each side shows:
 You can point both dropdowns at the same company if you just want one big
 pane instead of two.
 
-- **Dragging a trooper**: click and hold their name, drag to any billet
-  (Commander, XO, 1SG, Platoon Leader/Sergeant, Squad Leader, or a squad's
-  member list) in either pane, and release. Occupied billets are
-  **blocked** — you can't drop onto a slot that already has someone in it;
-  move or remove the current occupant first.
+- **Click to assign (the easy way)**: every **VACANT** billet is clickable,
+  and each squad's member list ends with **+ assign trooper**. Clicking
+  opens a picker showing just the people that billet normally draws from
+  (officers for CO/XO/Platoon Leader, senior NCOs for SGM/1SG/PSG, junior
+  NCOs for Squad Leader, everyone for members), sorted by rank with pool
+  members first, each showing their MOS, where they currently sit, and
+  their squad's practice time. Search to narrow, tick **Show all ranks**
+  if you need someone outside the usual tier, and click **Assign** — done.
+- **Dragging a trooper**: still works everywhere — click and hold their
+  name, drag to any billet (Commander, XO, 1SG, Platoon Leader/Sergeant,
+  Squad Leader, or a squad's member list) in either pane, and release.
+  Occupied billets are **blocked** — you can't drop onto a slot that
+  already has someone in it; move or remove the current occupant first.
 - **Dragging a whole squad**: click and hold the **⠿ Squad N** handle in a
   squad's summary line (next to its Leader) and drop it on the dashed
   **"Drop a squad here"** strip below any platoon's squad list — moves the
@@ -210,7 +218,7 @@ for copying numbers out). Includes:
 
 2-7 is expected to eventually split into two battalions (working names
 **HLLV** and **HLLWW2**). The **Split Planner** tab walks you through it in
-four phases, each with its own progress tracking. Nothing is locked — every
+five phases, each with its own progress tracking. Nothing is locked — every
 other tool keeps working the whole time — but the intended order is:
 
 **1. Sort troopers.** The app opens on the Split Planner, and phase 1 has a
@@ -242,28 +250,58 @@ a summary lists how many tags applied plus anyone not found and any lines
 it couldn't read. Re-importing a corrected file is always safe — later tags
 just overwrite earlier ones.
 
-**2. Review leadership.** The planner breaks each battalion's tagged group
+If Charlie Company is going to HLLV wholesale, skip sorting it person by
+person: tick **Send Charlie Company (C/2-7) to HLLV intact** on the same
+card. That tags all of C's members HLLV immediately, and when you commit,
+the entire company — structure, leadership, and practice times — lands in
+HLLV exactly as it is today instead of its people going through the pool.
+
+**2. Practice times.** One question: accept the current practice times, or
+edit them first? **Accept current practice times** fills in the known 2-7
+schedule for every squad (Able at THU 2359z, Baker by platoon, Easy and
+the B/ACD pool per squad) and signs the phase off in one click. **Edit
+practice times** expands a per-squad table — every current squad including
+the B/ACD pool's, grouped by company, each row showing the squad's MOS
+makeup (like `11B ×6 · 68W ×2`) beside a time box pre-filled with those
+same defaults — tweak whatever differs, then **Save practice times** to
+sign off and collapse the table. Edits save as you type, don't count as
+pending changes, and travel with a squad if you drag the whole squad
+somewhere else. Changing a time later clears the sign-off until you save
+again.
+
+**3. Review leadership.** The planner breaks each battalion's tagged group
 into **Officers / Senior NCOs / Junior NCOs / Troopers** (click a tier to
 see names). Each tier is labeled with the billets it can fill — officers
 for CO/XO/Platoon Leader, senior NCOs for SGM/1SG/Platoon Sergeant, junior
 NCOs for Squad Leader. If a battalion shows a red **0** in a leadership
 tier, it can't fill those billets yet — re-balance your tags before moving
-on.
+on. When both battalions look workable, click **Accept leadership
+review** to sign the phase off. Re-tagging anyone afterwards (toggle, CSV
+import, or random tags) clears the acceptance, since the review no longer
+matches the tags.
 
-**3. Commit the split.** Click **Commit Split** to generate the `HLLV` and
-`HLLWW2` rosters. Each starts as an *empty battalion* — no companies, HQ
+**4. Commit the split.** **Commit Split** stays locked until three things
+are true — everyone is sorted (0 undecided), practice times are accepted,
+and the leadership review is accepted — and lists whichever are still
+missing right under the button. Once unlocked, clicking it generates the
+`HLLV` and `HLLWW2` rosters. Each starts as an *empty battalion* — no companies, HQ
 vacant — with everyone tagged for it waiting in its Unassigned pool, sorted
 by rank. Deliberately no old structure carried over: you build the new
 battalion around the leadership you actually have, rather than reshaping
 2-7's layout. Safe to re-run as tags change — it updates the same two
 rosters rather than duplicating them.
 
-**4. Build the battalions.** The planner tracks each battalion's progress
+**5. Unit Builder.** The planner tracks each battalion's progress
 (HQ filled, companies created, company leadership filled, troopers still in
 the pool) and gives you an **Open in Drag & Drop** button per battalion.
-Build order: drag your Battalion CO/XO/SGM out of the pool onto Battalion
-HQ first, then **+ Add Company** for each company you have leadership for,
-fill its CO/XO/1SG, and work down through platoons and squads.
+Each battalion also gets a **💡 Suggested structure**: your old squads kept
+intact, grouped into proposed companies by practice time, with each squad's
+origin and MOS makeup listed. **Apply suggested structure** builds it in
+one click — squads placed, every leadership billet left vacant on purpose —
+and it lands as unsaved changes on that roster, so you can open it, review,
+tweak, and Save (or Revert to throw it away). Then fill leadership top-down:
+click the vacant Battalion CO/XO/SGM billets to pick from the officer/NCO
+lists, and work down through company and platoon leadership the same way.
 
 The split toggles only appear on the source roster — rosters tagged **New**
 (the split's outputs) hide them, and the Battalion Roster tab's badge always
@@ -282,8 +320,9 @@ Revert Changes to back out before saving.
 to pull in real people, and drag them into place.
 
 **Splitting the battalion into two:** open the **Split Planner** tab and
-follow its four phases — tag everyone N/HLLV/HLLWW2, review each group's
-leadership, Commit Split, then build each battalion up from its pool. See
+follow its five phases — tag everyone N/HLLV/HLLWW2, log each squad's
+practice time, review each group's leadership, Commit Split, then build
+each battalion up from its pool. See
 [Splitting the battalion](#splitting-the-battalion-split-planner) above.
 
 **Cleaning up the history:** if a test move or mis-click got saved to the

@@ -1,9 +1,16 @@
 import { useRef, useState } from "react";
-import type { RosterData, Soldier } from "../types/roster";
+import type { RosterData, Soldier, Squad } from "../types/roster";
 import type { RosterSummary } from "../lib/persistence";
-import { collectAllSoldiers, collectCompanySoldiers, computeLeadershipFillByCompany } from "../lib/analytics";
+import type { SquadLocation } from "../lib/moveSoldier";
+import {
+  collectAllSoldiers,
+  collectCompanySoldiers,
+  computeLeadershipFillByCompany,
+  computeSquadMos,
+} from "../lib/analytics";
 import { bucketByTier, TIER_BILLETS, TIER_LABELS, TIER_ORDER } from "../lib/leadership";
-import { SPLIT_GROUPS } from "../lib/splitReorg";
+import { INTACT_TRANSFER, SPLIT_GROUPS } from "../lib/splitReorg";
+import { suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
 import { parseSplitTagCsv, type SplitTagImportResult, type SplitTagRow } from "../lib/splitTagImport";
 import "./SplitPlanner.css";
 
@@ -41,6 +48,35 @@ function TierList({ soldiers }: { soldiers: Soldier[] }) {
   );
 }
 
+function PracticeRow({
+  location,
+  squad,
+  onSetPracticeTime,
+}: {
+  location: SquadLocation;
+  squad: Squad;
+  onSetPracticeTime: (location: SquadLocation, time: string) => void;
+}) {
+  const mos = computeSquadMos(squad);
+  return (
+    <div className="practice-row">
+      <span className="practice-unit">
+        Plt {location.platoon} / Sqd {location.squad}
+      </span>
+      <span className="practice-mos">
+        {mos.length > 0 ? mos.map((m) => `${m.label} ×${m.value}`).join(" · ") : "empty"}
+      </span>
+      <input
+        className="practice-input"
+        type="text"
+        placeholder="e.g. Tue 1900 EST"
+        value={squad.practiceTime ?? ""}
+        onChange={(e) => onSetPracticeTime(location, e.target.value)}
+      />
+    </div>
+  );
+}
+
 export function SplitPlanner({
   roster,
   rosterList,
@@ -50,6 +86,14 @@ export function SplitPlanner({
   onOpenRoster,
   onStartSorting,
   onImportSplitTags,
+  onRandomizeSplitTags,
+  onSetPracticeTime,
+  onAcceptPracticeTimes,
+  onBeginEditPracticeTimes,
+  onSavePracticeTimes,
+  onAcceptLeadership,
+  onSetCharlieToHllv,
+  onApplySuggestion,
 }: {
   roster: RosterData;
   rosterList: RosterSummary[];
@@ -59,9 +103,18 @@ export function SplitPlanner({
   onOpenRoster: (id: string) => void;
   onStartSorting: () => void;
   onImportSplitTags: (rows: SplitTagRow[]) => SplitTagImportResult | null;
+  onRandomizeSplitTags: () => void;
+  onSetPracticeTime: (location: SquadLocation, time: string) => void;
+  onAcceptPracticeTimes: () => void;
+  onBeginEditPracticeTimes: () => void;
+  onSavePracticeTimes: () => void;
+  onAcceptLeadership: () => void;
+  onSetCharlieToHllv: (enabled: boolean) => void;
+  onApplySuggestion: (targetId: string, suggestions: SuggestedCompany[]) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importSummary, setImportSummary] = useState<string[] | null>(null);
+  const [editingTimes, setEditingTimes] = useState(false);
 
   function handleTagFile(file: File) {
     file.text().then((text) => {
@@ -132,6 +185,37 @@ export function SplitPlanner({
         ? "done"
         : "active";
 
+  // B/ACD (the Unassigned pool) practices too — findCompany resolves its
+  // "UNASSIGNED" letter the same as any company, so its squads join in.
+  const practiceCompanies = [...roster.battalion.companies, roster.unassigned];
+  const allSquads = practiceCompanies.flatMap((company) =>
+    company.platoons.flatMap((platoon) =>
+      platoon.squads.map((squad) => ({
+        location: { company: company.letter, platoon: platoon.number, squad: squad.number },
+        squad,
+      })),
+    ),
+  );
+  const timedCount = allSquads.filter((s) => (s.squad.practiceTime ?? "").trim() !== "").length;
+  const practiceState: PhaseState = roster.practiceTimesConfirmed
+    ? "done"
+    : timedCount > 0 || editingTimes
+      ? "active"
+      : "todo";
+  const leadershipState: PhaseState = roster.leadershipAccepted
+    ? "done"
+    : taggedCount > 0
+      ? "active"
+      : "todo";
+
+  // Commit Split stays locked until sorting is finished and both sign-offs
+  // are in — the blockers list doubles as the explanation shown to the user.
+  const commitBlockers: string[] = [];
+  if (everyone.length === 0) commitBlockers.push("Nobody is on this roster yet");
+  else if (neutralCount > 0) commitBlockers.push(`${neutralCount} troopers are still undecided (phase 1)`);
+  if (!roster.practiceTimesConfirmed) commitBlockers.push("Practice times haven't been accepted (phase 2)");
+  if (!roster.leadershipAccepted) commitBlockers.push("Leadership review hasn't been accepted (phase 3)");
+
   return (
     <div className="split-planner">
       {activeConfiguration === "new" && (
@@ -171,6 +255,13 @@ export function SplitPlanner({
             <button className="add-btn" onClick={() => fileInputRef.current?.click()}>
               Import tags from CSV…
             </button>
+            <button
+              className="add-btn"
+              onClick={onRandomizeSplitTags}
+              title="Test helper: coin-flip every trooper onto HLLV or HLLWW2 so you can play with the later phases"
+            >
+              🎲 Random tags (test)
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -191,17 +282,126 @@ export function SplitPlanner({
             ))}
           </div>
         )}
+        {activeConfiguration !== "new" &&
+          roster.battalion.companies.some((c) => c.letter === INTACT_TRANSFER.letter) && (
+            <label className="intact-flag">
+              <input
+                type="checkbox"
+                checked={!!roster.sendCharlieToHllv}
+                onChange={(e) => onSetCharlieToHllv(e.target.checked)}
+              />{" "}
+              Send Charlie Company (C/2-7) to HLLV <strong>intact</strong> — tags all its members
+              HLLV now; Commit carries the whole company (structure, leadership, practice times)
+              straight into HLLV instead of through its pool.
+            </label>
+          )}
       </section>
 
       <section className="phase-card">
         <header>
           <span className="phase-number">2</span>
+          <h3>Practice times</h3>
+          <PhaseChip state={practiceState} />
+        </header>
+        <p>
+          Record when each current squad practices, with its MOS makeup alongside — so the Unit
+          Builder step can keep squads that train together (or share a specialty) intact. Times are
+          free text, saved as you type, and don't count as pending changes.
+        </p>
+        {allSquads.length === 0 ? (
+          <p className="tier-empty">
+            No squads on this roster yet — this phase reads the active roster's squads.
+          </p>
+        ) : (
+          <>
+            <div className="sort-counts">
+              <span className="sort-count">
+                {timedCount}/{allSquads.length} squads have a practice time
+              </span>
+              {roster.practiceTimesConfirmed && (
+                <span className="sort-count signoff-ok">Accepted ✓</span>
+              )}
+            </div>
+            {activeConfiguration !== "new" && !editingTimes && (
+              <>
+                <p className="signoff-question">
+                  Accept the current practice times, or edit them first?
+                </p>
+                <div className="sort-actions">
+                  <button
+                    className="add-btn"
+                    onClick={onAcceptPracticeTimes}
+                    disabled={roster.practiceTimesConfirmed}
+                  >
+                    Accept current practice times
+                  </button>
+                  <button
+                    className="add-btn"
+                    onClick={() => {
+                      onBeginEditPracticeTimes();
+                      setEditingTimes(true);
+                    }}
+                  >
+                    Edit practice times
+                  </button>
+                </div>
+              </>
+            )}
+            {editingTimes && (
+              <>
+                <div className="practice-list">
+                  {practiceCompanies.map((company) =>
+                    company.platoons.some((p) => p.squads.length > 0) ? (
+                      <div key={company.letter} className="practice-company">
+                        <h4>
+                          {company.letter === "UNASSIGNED"
+                            ? "Unassigned (B/ACD)"
+                            : `${company.name} Company (${company.letter})`}
+                        </h4>
+                        {company.platoons.flatMap((platoon) =>
+                          platoon.squads.map((squad) => (
+                            <PracticeRow
+                              key={`${platoon.number}-${squad.number}`}
+                              location={{
+                                company: company.letter,
+                                platoon: platoon.number,
+                                squad: squad.number,
+                              }}
+                              squad={squad}
+                              onSetPracticeTime={onSetPracticeTime}
+                            />
+                          )),
+                        )}
+                      </div>
+                    ) : null,
+                  )}
+                </div>
+                <button
+                  className="add-btn save-times-btn"
+                  onClick={() => {
+                    onSavePracticeTimes();
+                    setEditingTimes(false);
+                  }}
+                >
+                  Save practice times
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="phase-card">
+        <header>
+          <span className="phase-number">3</span>
           <h3>Review leadership</h3>
-          <PhaseChip state={taggedCount > 0 ? "active" : "todo"} />
+          <PhaseChip state={leadershipState} />
         </header>
         <p>
           What each battalion has to work with, by tier. A zero in Officers or Senior NCOs means that
           battalion can't fill its key billets yet — consider re-balancing tags before committing.
+          When both battalions look workable, click <strong>Accept</strong> below — Commit Split stays
+          locked until you do, and re-tagging anyone clears the acceptance.
         </p>
         <div className="group-grid">
           {groups.map((g) => (
@@ -217,11 +417,20 @@ export function SplitPlanner({
             </div>
           ))}
         </div>
+        {activeConfiguration !== "new" && (
+          <button
+            className={`add-btn accept-leadership-btn${roster.leadershipAccepted ? " accepted" : ""}`}
+            onClick={onAcceptLeadership}
+            disabled={taggedCount === 0 || roster.leadershipAccepted}
+          >
+            {roster.leadershipAccepted ? "Leadership review accepted ✓" : "Accept leadership review"}
+          </button>
+        )}
       </section>
 
       <section className="phase-card">
         <header>
-          <span className="phase-number">3</span>
+          <span className="phase-number">4</span>
           <h3>Commit the split</h3>
           <PhaseChip state={commitState} />
         </header>
@@ -230,15 +439,26 @@ export function SplitPlanner({
           <strong>Unassigned pool</strong>, sorted by rank, under an empty battalion — structure comes in
           the next step. Safe to re-run as tags change; it overwrites the same two rosters.
         </p>
-        <button className="add-btn commit-split-btn" onClick={onCommitSplit} disabled={taggedCount === 0}>
+        <button
+          className="add-btn commit-split-btn"
+          onClick={onCommitSplit}
+          disabled={commitBlockers.length > 0}
+        >
           {commitState === "todo" ? "Commit Split" : "Re-commit (update both rosters)"}
         </button>
+        {commitBlockers.length > 0 && (
+          <ul className="commit-blockers">
+            {commitBlockers.map((blocker) => (
+              <li key={blocker}>{blocker}</li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="phase-card">
         <header>
-          <span className="phase-number">4</span>
-          <h3>Build the battalions</h3>
+          <span className="phase-number">5</span>
+          <h3>Unit Builder</h3>
           <PhaseChip state={buildState} />
         </header>
         <p>
@@ -250,22 +470,77 @@ export function SplitPlanner({
           <p className="tier-empty">Run Commit Split to create the battalion rosters first.</p>
         ) : (
           <div className="group-grid">
-            {builds.map((b) => (
-              <div key={b.status} className={`group-card group-${b.status}`}>
-                <h4>{b.name}</h4>
-                <ul className="build-stats">
-                  <li className={b.hqFilled === 3 ? "stat-done" : ""}>Battalion HQ: {b.hqFilled}/3 filled</li>
-                  <li className={b.companies > 0 ? "stat-done" : ""}>Companies created: {b.companies}</li>
-                  <li className={b.leadTotal > 0 && b.leadFilled === b.leadTotal ? "stat-done" : ""}>
-                    Company leadership: {b.leadFilled}/{b.leadTotal} filled
-                  </li>
-                  <li className={b.poolLeft === 0 ? "stat-done" : ""}>Still in pool: {b.poolLeft}</li>
-                </ul>
-                <button className="add-btn" onClick={() => onOpenRoster(b.summary!.id)}>
-                  Open {b.name} in Drag &amp; Drop
-                </button>
-              </div>
-            ))}
+            {builds.map((b) => {
+              // Suggestions come from the SOURCE roster's tags + practice
+              // times, so they're only meaningful when planning from it.
+              const suggestions =
+                b.data && activeConfiguration !== "new"
+                  ? suggestCompanies(roster, b.status, {
+                      excludeCompanies:
+                        roster.sendCharlieToHllv && b.status === INTACT_TRANSFER.status
+                          ? [INTACT_TRANSFER.letter]
+                          : [],
+                      usedLetters: b.data.battalion.companies.map((c) => c.letter),
+                    })
+                  : [];
+              return (
+                <div key={b.status} className={`group-card group-${b.status}`}>
+                  <h4>{b.name}</h4>
+                  <ul className="build-stats">
+                    <li className={b.hqFilled === 3 ? "stat-done" : ""}>Battalion HQ: {b.hqFilled}/3 filled</li>
+                    <li className={b.companies > 0 ? "stat-done" : ""}>Companies created: {b.companies}</li>
+                    <li className={b.leadTotal > 0 && b.leadFilled === b.leadTotal ? "stat-done" : ""}>
+                      Company leadership: {b.leadFilled}/{b.leadTotal} filled
+                    </li>
+                    <li className={b.poolLeft === 0 ? "stat-done" : ""}>Still in pool: {b.poolLeft}</li>
+                  </ul>
+                  {suggestions.length > 0 && (
+                    <details className="suggestion-block">
+                      <summary>
+                        💡 Suggested structure — {suggestions.length}{" "}
+                        {suggestions.length === 1 ? "company" : "companies"} from practice times
+                      </summary>
+                      <p className="suggestion-hint">
+                        Old squads kept intact, grouped into companies by practice time, MOS makeup
+                        shown per squad. Applying places the squads and leaves every leadership
+                        billet vacant for you to fill.
+                      </p>
+                      {suggestions.map((sc) => (
+                        <div key={sc.letter} className="suggestion-company">
+                          <h5>
+                            {sc.name} Company ({sc.letter}) — {sc.practiceTime} · {sc.headcount}{" "}
+                            troopers
+                          </h5>
+                          {sc.platoons.map((sp) => (
+                            <div key={sp.number} className="suggestion-platoon">
+                              Platoon {sp.number}
+                              <ul>
+                                {sp.squads.map((ss) => (
+                                  <li key={ss.sourceLabel}>
+                                    from {ss.sourceLabel} —{" "}
+                                    {(ss.leader ? 1 : 0) + ss.members.length} troopers ·{" "}
+                                    {ss.mos.map((m) => `${m.label} ×${m.value}`).join(" · ")}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                      <button
+                        className="add-btn"
+                        onClick={() => onApplySuggestion(b.summary!.id, suggestions)}
+                      >
+                        Apply suggested structure to {b.name}
+                      </button>
+                    </details>
+                  )}
+                  <button className="add-btn" onClick={() => onOpenRoster(b.summary!.id)}>
+                    Open {b.name} in Drag &amp; Drop
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

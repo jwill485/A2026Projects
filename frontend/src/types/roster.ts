@@ -21,6 +21,10 @@ export interface Squad {
   number: string;
   leader: Soldier | null;
   members: Soldier[];
+  // Free-text practice/drill schedule (e.g. "Tue 1900 EST"), entered on the
+  // Split Planner's practice-times phase. Like splitStatus, it's planning
+  // metadata: not part of diffRosters, so it never counts as a pending change.
+  practiceTime?: string;
 }
 
 export interface Platoon {
@@ -50,4 +54,15 @@ export interface Battalion {
 export interface RosterData {
   battalion: Battalion;
   unassigned: Company;
+  // Split Planner sign-offs (§2.9): the user has accepted the practice
+  // times (phase 2) / the leadership review (phase 3). Both must be set —
+  // along with zero undecided troopers — before Commit Split unlocks.
+  // Planning metadata like splitStatus: invisible to diffRosters.
+  practiceTimesConfirmed?: boolean;
+  leadershipAccepted?: boolean;
+  // §2.9: Charlie Company (C/2-7) transfers to HLLV as an intact company.
+  // Checking it auto-tags all of C's members HLLV; on Commit, the whole
+  // company (structure, leadership, practice times) lands in HLLV's
+  // battalion instead of its members going through the Unassigned pool.
+  sendCharlieToHllv?: boolean;
 }

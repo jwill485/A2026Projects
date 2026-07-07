@@ -60,6 +60,18 @@ Dragging a trooper onto an occupied billet is **blocked** (no swap/bump) —
 move or remove the current occupant first. Troopers show small ✎ (edit) and
 ✕ (delete) affordances alongside their name.
 
+**Click-to-assign** is the low-friction alternative to dragging
+(`CandidatePicker.tsx`): every vacant billet is a clickable button, and each
+squad's member list ends with a **+ assign trooper** affordance. Clicking
+opens a modal picker listing candidates filtered to the leadership tier the
+billet draws from (officers for CO/XO/PL, senior NCOs for SGM/1SG/PSG,
+junior NCOs for Squad Leader, everyone for members — same `leadership.ts`
+tiers as the Split Planner), rank-sorted with pool members first, each row
+showing MOS, current location, and squad practice time, with a search box
+and a **Show all ranks** escape hatch. One click places the person through
+the same `moveSoldier` path as a drag. Dragging still works everywhere —
+the button sits inside the droppable.
+
 A squad can also be dragged as a whole unit via its **⠿ Squad N** handle in
 the summary line, dropped onto any platoon's **squad-list drop zone** (a
 persistent "Drop a squad here" strip below that platoon's squads, since the
@@ -126,7 +138,7 @@ Configuration"** badge based on the active roster's tag, so it's always
 clear which one is in view. See [§8.1](#81-battalion-split-2-7--two-battalions)
 for the fuller history of this decision.
 
-The split is driven by a guided, four-phase workflow on the **Split
+The split is driven by a guided, five-phase workflow on the **Split
 Planner** tab (`SplitPlanner.tsx`) — the app's default landing tab — soft
 guidance with progress tracking, not a locked wizard; every other tool
 stays usable throughout:
@@ -147,26 +159,67 @@ stays usable throughout:
    are matched by username first (the unique MILPACS handle), then by real
    name as a fallback; a real name shared by several troopers is skipped as
    ambiguous rather than guessed at. An inline summary reports applied /
-   not-found / ambiguous / unreadable lines. The toggles (and the import
-   button) are hidden entirely on rosters tagged **New** — tagging only
+   not-found / ambiguous / unreadable lines. A **🎲 Random tags (test)**
+   button (confirm-gated, since it overwrites every tag) coin-flips
+   everyone onto HLLV or HLLWW2 — a test helper for exercising the later
+   phases without doing the real sort first. A **Send Charlie Company
+   (C/2-7) to HLLV intact** checkbox (`RosterData.sendCharlieToHllv`,
+   `INTACT_TRANSFER` in `splitReorg.ts`) short-circuits sorting for that
+   company: checking it tags all of C's members HLLV immediately, and on
+   commit the whole company — structure, leadership, practice times — is
+   carried into HLLV's battalion as-is, its members bypassing both pools
+   entirely (regardless of any individual re-tags). The toggles (and these
+   buttons) are hidden entirely on rosters tagged **New** — tagging only
    means something on the source roster.
-2. **Review leadership** — the planner buckets each battalion's tagged pool
+2. **Practice times** — asks one question: accept the current practice
+   times, or edit them first? **Accept** fills every blank squad with the
+   known real 2-7 schedule (`practiceDefaults.ts` — e.g. all of Able at
+   THU 2359z, Baker by platoon, Easy and the B/ACD pool by squad) and
+   signs the set off in one click. **Edit** expands a per-squad table —
+   the active roster's current squads including the Unassigned (B/ACD)
+   pool's, grouped by company, each row showing the squad's MOS makeup
+   (via `computeSquadMos`) beside a free-text time input, pre-filled with
+   the same defaults — and **Save practice times** signs off and
+   collapses it. The sign-off is `RosterData.practiceTimesConfirmed`;
+   editing any time clears it until the next save. Times are stored as
+   `Squad.practiceTime` (`setSquadPracticeTime` in `moveSoldier.ts`); like
+   `splitStatus`, all of this is planning metadata invisible to
+   `diffRosters`, so it never counts as a pending change. Squads moved
+   whole (§2.3) carry their practice time with them. The point: the Unit
+   Builder step can keep squads that train together — or share a
+   specialty — intact.
+3. **Review leadership** — the planner buckets each battalion's tagged pool
    into **Officers / Senior NCOs / Junior NCOs / Troopers** (classified by
    rank in `leadership.ts`), each annotated with the billets that tier
    feeds (officers → CO/XO/PL, senior NCOs → SGM/1SG/PSG, junior NCOs →
    Squad Leader). A zero in a leadership tier is flagged red — the cue to
-   re-balance tags before committing.
-3. **Commit Split** — generates (or, on re-run, overwrites) the two
+   re-balance tags before committing. Ends with an explicit **Accept
+   leadership review** button (`RosterData.leadershipAccepted`); changing
+   anyone's split tag afterwards — toggle, CSV import, or the random-tag
+   test button — clears the acceptance, since the review no longer
+   reflects the tags.
+4. **Commit Split** — locked until three gates pass, shown as a blocker
+   list under the button while any fail: zero undecided troopers (phase
+   1), practice times accepted (phase 2), and leadership review accepted
+   (phase 3). Generates (or, on re-run, overwrites) the two
    `HLLV`/`HLLWW2` rosters. Deliberately does **not** carry the old 2-7
    structure over: each new roster is an **empty battalion** (designation =
    battalion name, HQ vacant, no companies) with everyone tagged for it in
    the Unassigned pool, sorted by rank, split tags cleared. Structure gets
-   built deliberately in phase 4 around the leadership actually available.
-4. **Build** — per battalion, the planner tracks HQ fill (x/3), companies
-   created, company-leadership fill, and pool remaining, with an **Open in
-   Drag & Drop** button that switches roster + tab in one click. Intended
-   order: Battalion CO/XO/SGM first, then + Add Company per company you
-   have leadership for, then platoons/squads down from there.
+   built deliberately in phase 5 around the leadership actually available.
+5. **Unit Builder** — per battalion, the planner tracks HQ fill (x/3),
+   companies created, company-leadership fill, and pool remaining, with an
+   **Open in Drag & Drop** button that switches roster + tab in one click.
+   Each battalion card also shows a **💡 Suggested structure**
+   (`buildSuggestions.ts`): old squads kept intact as units, clustered by
+   practice time into proposed companies (up to 3 squads per platoon),
+   each squad annotated with its source (e.g. "from A/1/2"), headcount,
+   and MOS makeup. **Apply suggested structure** materializes it into the
+   committed roster — squads placed with practice times carried, every
+   leadership billet deliberately left vacant for click-to-assign (§2.3) —
+   saved but not baselined, so it shows up as reviewable pending changes.
+   Intended order: Battalion CO/XO/SGM first, then companies (applied or
+   hand-built), then leadership down through platoons/squads.
 
 The older manual path (Import Company/Import Trooper into hand-created
 rosters) still works and can be mixed in freely.
@@ -248,6 +301,7 @@ interface Squad {
   number: string;
   leader: Soldier | null;
   members: Soldier[];
+  practiceTime?: string; // free-text drill schedule; planning metadata like splitStatus
 }
 
 interface Platoon {
@@ -277,6 +331,9 @@ interface Battalion {
 interface RosterData {
   battalion: Battalion;
   unassigned: Company;   // the B/ACD-style holding pool; every roster has exactly one
+  practiceTimesConfirmed?: boolean; // §2.9 phase 2 sign-off; gates Commit Split
+  leadershipAccepted?: boolean;     // §2.9 phase 3 sign-off; gates Commit Split
+  sendCharlieToHllv?: boolean;      // §2.9: carry C/2-7 into HLLV intact on commit
 }
 ```
 
@@ -488,7 +545,7 @@ top of Multiple Named Rosters (§2.1/§2.9) rather than restructuring
 `RosterData` — no data-model change needed, since every roster already has
 exactly one battalion, which is precisely what each split-off battalion is.
 The supporting tooling (roster tagging/badge, whole-company import, the
-per-trooper N/HLLV/HLLWW2 decision tag, and the guided four-phase **Split
+per-trooper N/HLLV/HLLWW2 decision tag, and the guided five-phase **Split
 Planner** with leadership review and Commit Split — see §2.9) is done; the
 actual reorg work (deciding who goes where, then building each battalion's
 structure) is ongoing, separate work using that tooling.
@@ -505,6 +562,15 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 
 ### 8.3 Other Not-Yet-Built Ideas
 
+- **Unit Builder redesign — remaining ideas:** the first round is built
+  (click-to-assign with tier-filtered candidate pickers §2.3, practice-time
+  clustered build suggestions §2.9 phase 5, the C→HLLV intact transfer).
+  Still open if wanted: a dedicated step-by-step build surface that walks
+  battalion HQ → company leadership → platoon leadership → squads as
+  explicit stages rather than one open tree; generalizing the intact
+  transfer to any company → either battalion; and smarter suggestion
+  heuristics (MOS balancing across platoons, e.g. spreading medics, rather
+  than clustering purely by practice time).
 - **Personnel query tab:** a separate tab for querying MILPACS profile data
   about troopers in 2-7 and B/ACD — graduations, disciplinary records,
   awards, secondary billets, ranks, and MOS. The full (non-lite) roster
