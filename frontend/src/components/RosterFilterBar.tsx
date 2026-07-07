@@ -37,6 +37,15 @@ export function RosterFilterBar({
           </option>
         ))}
       </select>
+      <select
+        value={filter.splitTag}
+        onChange={(e) => onChange({ ...filter, splitTag: e.target.value as RosterFilter["splitTag"] })}
+      >
+        <option value="">Any split tag</option>
+        <option value="neutral">Neutral (undecided)</option>
+        <option value="hllv">HLLV</option>
+        <option value="hllww2">HLLWW2</option>
+      </select>
       <label className="filter-vacant-toggle">
         <input
           type="checkbox"

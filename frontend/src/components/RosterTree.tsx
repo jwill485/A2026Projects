@@ -13,8 +13,6 @@ import "./RosterTree.css";
 
 type SetSplitStatus = (userId: string, status: SplitStatus) => void;
 
-function noopSetSplitStatus() {}
-
 function SoldierName({
   soldier,
   filter,
@@ -22,7 +20,9 @@ function SoldierName({
 }: {
   soldier: Soldier | null;
   filter: RosterFilter;
-  onSetSplitStatus: SetSplitStatus;
+  // When absent, the split toggle isn't rendered at all (e.g. on a roster
+  // that's already one of the split's outputs, where tagging is meaningless).
+  onSetSplitStatus?: SetSplitStatus;
 }) {
   if (!soldier) {
     return <span className={`vacant${filter.vacantOnly ? " filter-match" : ""}`}>VACANT</span>;
@@ -32,10 +32,12 @@ function SoldierName({
     <span className={`soldier-name${matched ? " filter-match" : ""}`}>
       {soldier.rankShort} {soldier.realName}
       <span className="soldier-username"> ({soldier.username})</span>
-      <SplitStatusToggle
-        status={soldier.splitStatus ?? "neutral"}
-        onChange={(next) => onSetSplitStatus(soldier.userId, next)}
-      />
+      {onSetSplitStatus && (
+        <SplitStatusToggle
+          status={soldier.splitStatus ?? "neutral"}
+          onChange={(next) => onSetSplitStatus(soldier.userId, next)}
+        />
+      )}
     </span>
   );
 }
@@ -47,7 +49,7 @@ function SquadNode({
 }: {
   squad: Squad;
   filter: RosterFilter;
-  onSetSplitStatus: SetSplitStatus;
+  onSetSplitStatus?: SetSplitStatus;
 }) {
   return (
     <details className="tree-node squad-node" open>
@@ -75,7 +77,7 @@ function PlatoonNode({
 }: {
   platoon: Platoon;
   filter: RosterFilter;
-  onSetSplitStatus: SetSplitStatus;
+  onSetSplitStatus?: SetSplitStatus;
 }) {
   const total = platoon.squads.reduce(
     (sum, s) => sum + s.members.length + (s.leader ? 1 : 0),
@@ -109,7 +111,7 @@ function CompanyNode({
   company: Company;
   title?: string;
   filter: RosterFilter;
-  onSetSplitStatus: SetSplitStatus;
+  onSetSplitStatus?: SetSplitStatus;
 }) {
   const total = company.platoons.reduce(
     (sum, p) =>
@@ -141,7 +143,7 @@ function CompanyNode({
 export function RosterTree({
   battalion,
   filter = EMPTY_FILTER,
-  onSetSplitStatus = noopSetSplitStatus,
+  onSetSplitStatus,
 }: {
   battalion: Battalion;
   filter?: RosterFilter;
@@ -170,11 +172,15 @@ export function RosterTree({
 export function UnassignedPool({
   group,
   filter = EMPTY_FILTER,
-  onSetSplitStatus = noopSetSplitStatus,
+  onSetSplitStatus,
+  title = "B/ACD",
+  hint = "From B/ACD — pending manual reassignment into Charlie Company. Structure shown as currently organized within B/ACD.",
 }: {
   group: Company;
   filter?: RosterFilter;
   onSetSplitStatus?: SetSplitStatus;
+  title?: string;
+  hint?: string;
 }) {
   const hasAnyone =
     group.commander ||
@@ -186,11 +192,8 @@ export function UnassignedPool({
   return (
     <div className="unassigned-pool">
       <h3>Unassigned</h3>
-      <p className="unassigned-hint">
-        From B/ACD — pending manual reassignment into Charlie Company. Structure shown as
-        currently organized within B/ACD.
-      </p>
-      <CompanyNode company={group} title="B/ACD" filter={filter} onSetSplitStatus={onSetSplitStatus} />
+      <p className="unassigned-hint">{hint}</p>
+      <CompanyNode company={group} title={title} filter={filter} onSetSplitStatus={onSetSplitStatus} />
     </div>
   );
 }

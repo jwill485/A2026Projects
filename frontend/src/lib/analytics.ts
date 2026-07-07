@@ -15,7 +15,7 @@ export interface VacancyEntry {
   label: string;
 }
 
-function collectCompanySoldiers(company: Company): Soldier[] {
+export function collectCompanySoldiers(company: Company): Soldier[] {
   const soldiers: Soldier[] = [];
   if (company.commander) soldiers.push(company.commander);
   if (company.executiveOfficer) soldiers.push(company.executiveOfficer);

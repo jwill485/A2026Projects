@@ -38,7 +38,7 @@ interface Actions {
   onDeleteSquad: (company: string, platoon: string, squad: string) => void;
   onRequestEdit: (soldier: Soldier) => void;
   onDeleteSoldier: (userId: string) => void;
-  onSetSplitStatus: (userId: string, status: SplitStatus) => void;
+  onSetSplitStatus?: (userId: string, status: SplitStatus) => void;
   filter: RosterFilter;
 }
 
@@ -67,10 +67,12 @@ function DraggableSoldier({ soldier }: { soldier: Soldier }) {
         {soldier.rankShort} {soldier.realName}
         {soldier.username && <span className="soldier-username"> ({soldier.username})</span>}
       </span>
-      <SplitStatusToggle
-        status={soldier.splitStatus ?? "neutral"}
-        onChange={(next) => onSetSplitStatus(soldier.userId, next)}
-      />
+      {onSetSplitStatus && (
+        <SplitStatusToggle
+          status={soldier.splitStatus ?? "neutral"}
+          onChange={(next) => onSetSplitStatus(soldier.userId, next)}
+        />
+      )}
       <button
         type="button"
         className="icon-btn"
@@ -349,15 +351,11 @@ function findPane(roster: RosterData, letter: string): Company {
   return roster.battalion.companies.find((c) => c.letter === letter) ?? roster.unassigned;
 }
 
-function PaneColumn({ company }: { company: Company }) {
+function PaneColumn({ company, unassignedHint }: { company: Company; unassignedHint: string }) {
   const isUnassigned = company.letter === "UNASSIGNED";
   return (
     <div className={`kanban-column${isUnassigned ? " unassigned-pool" : ""}`}>
-      {isUnassigned && (
-        <p className="unassigned-hint">
-          From B/ACD — drag troopers into Charlie Company (or anywhere else) to reassign them.
-        </p>
-      )}
+      {isUnassigned && <p className="unassigned-hint">{unassignedHint}</p>}
       <DragDropCompany company={company} />
     </div>
   );
@@ -376,6 +374,7 @@ export function DragDropTree({
   onImportCompany,
   onSetSplitStatus,
   filter = EMPTY_FILTER,
+  unassignedHint = "From B/ACD — drag troopers into Charlie Company (or anywhere else) to reassign them.",
 }: {
   roster: RosterData;
   rosterId: string;
@@ -387,8 +386,9 @@ export function DragDropTree({
   onDeleteSoldier: (userId: string) => void;
   onImportSoldier: (soldier: Soldier, targetLetter: string) => boolean;
   onImportCompany: (company: Company) => boolean;
-  onSetSplitStatus: (userId: string, status: SplitStatus) => void;
+  onSetSplitStatus?: (userId: string, status: SplitStatus) => void;
   filter?: RosterFilter;
+  unassignedHint?: string;
 }) {
   const options = paneOptions(roster);
   const [leftLetter, setLeftLetter] = useState(
@@ -520,8 +520,8 @@ export function DragDropTree({
         </div>
 
         <div className="kanban-columns">
-          <PaneColumn company={findPane(roster, leftLetter)} />
-          <PaneColumn company={findPane(roster, rightLetter)} />
+          <PaneColumn company={findPane(roster, leftLetter)} unassignedHint={unassignedHint} />
+          <PaneColumn company={findPane(roster, rightLetter)} unassignedHint={unassignedHint} />
         </div>
       </DndContext>
 

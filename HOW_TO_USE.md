@@ -48,7 +48,7 @@ live 2-7 data. A dropdown plus three buttons let you manage them:
   companies) or **Duplicate current roster** (copies everything in the
   roster you're currently viewing), and an optional **Configuration** tag:
   **None**, **Old (pre-split)**, or **New (post-split)** — see
-  [Tagging Old vs. New](#tagging-old-vs-new-battalion-split) below.
+  [Splitting the battalion](#splitting-the-battalion-split-planner) below.
 - **Rename** — opens "Edit Roster", where you can change the name and/or the
   Configuration tag of the currently active roster at any time.
 - **Delete** — removes the active roster entirely (with confirmation).
@@ -61,7 +61,7 @@ been using an older version of the app before rosters had names, your
 existing saved data is carried into a roster with that same name — nothing
 is lost).
 
-## The three tabs
+## The four tabs
 
 Next to the roster dropdown are two more boxes: the **tabs** (what you're
 viewing) and the **action buttons** (things you can do). The tabs are:
@@ -81,13 +81,13 @@ viewing) and the **action buttons** (things you can do). The tabs are:
   indented list of the whole battalion (one line per billet) — unlike the
   org chart, it works even with unsaved changes. Use your browser's Print
   (or Save as PDF) while it's open for a clean printout without the app's
-  nav/buttons; click **Hide Roster List** to go back to the tree. A
-  **Commit Split** button generates (or updates) the `HLLV`/`HLLWW2`
-  rosters from every trooper's split-status tag — see
-  [Tagging Old vs. New](#tagging-old-vs-new-battalion-split) below.
+  nav/buttons; click **Hide Roster List** to go back to the tree.
 - **Drag & Drop** — the same structure, but editable: drag troopers between
   billets, add companies/platoons/squads, and add/edit/delete/import
   troopers and whole companies.
+- **Split Planner** — the guided home for splitting 2-7 into two new
+  battalions, in four tracked phases — see
+  [Splitting the battalion](#splitting-the-battalion-split-planner) below.
 - **Analytics** — charts and tables: leadership fill rate, headcount, MOS
   breakdown, and a vacancy report.
 
@@ -95,8 +95,10 @@ viewing) and the **action buttons** (things you can do). The tabs are:
 
 A filter bar sits above both the Battalion Roster and Drag & Drop tabs (one
 shared filter — it stays active if you switch between them): a name search
-box, **Rank** and **MOS** dropdowns (fixed lists, not free typing), and a
-**Vacant leadership only** checkbox. Matches get a yellow highlight;
+box, **Rank** and **MOS** dropdowns (fixed lists, not free typing), a
+**split tag** dropdown (Any / Neutral / HLLV / HLLWW2 — handy for finding
+who's still undecided during a split), and a **Vacant leadership only**
+checkbox. Matches get a yellow highlight;
 companies/platoons/squads with no match anywhere inside them disappear from
 view entirely. It's purely visual — dragging, editing, and every other
 action still works normally underneath — and **Clear filter** (shown only
@@ -190,39 +192,51 @@ for copying numbers out). Includes:
 - MOS breakdown across the whole roster
 - Vacancy report — a plain list of every currently-vacant leadership billet
 
-## Tagging Old vs. New (battalion split)
+## Splitting the battalion (Split Planner)
 
 2-7 is expected to eventually split into two battalions (working names
-**HLLV** and **HLLWW2**). Rather than one roster trying to represent both at
-once, each ends up as its own separate named roster. Two ways to get there:
+**HLLV** and **HLLWW2**). The **Split Planner** tab walks you through it in
+four phases, each with its own progress tracking. Nothing is locked — every
+other tool keeps working the whole time — but the intended order is:
 
-**Decision tagging + Commit Split (faster, recommended for deciding who
-goes where):**
-1. On your current live roster, use the small **N / HLLV / HLLWW2** toggle
-   next to every trooper's name (Battalion Roster tree or Drag & Drop) to
-   mark them Neutral (undecided) or assigned to one of the two new
-   battalions. Combine with the name/rank/MOS filter to work through the
-   roster systematically.
-2. Tagging doesn't touch Save/Revert or the Change Log — it's a separate,
-   lightweight decision layer on top of the live roster, so you can leave it
-   half-finished and come back to it.
-3. Click **Commit Split** (Battalion Roster tab) to generate the `HLLV` and
-   `HLLWW2` rosters from the current tags — full company/platoon/squad
-   structure carried over, untagged billets left vacant. Running it again
-   later (as more people get tagged) updates those same two rosters rather
-   than creating duplicates.
+**1. Sort troopers.** The app opens on the Split Planner, and phase 1 has a
+**Start sorting (N to go) →** button that drops you straight into the
+Battalion Roster tree with the filter pre-set to undecided troopers — as you
+tag people they disappear from the view, so it works like a queue. Use the
+small **N / HLLV / HLLWW2** toggle next to each trooper's name (also
+available on Drag & Drop) to mark them Neutral (undecided) or assigned to
+one of the two new battalions. Tagging doesn't touch Save/Revert or the
+Change Log — it's a lightweight decision layer you can leave half-finished
+and come back to. The planner shows a running count of undecided vs. tagged.
 
-**Manual (import company-by-company or trooper-by-trooper):**
-1. Tag your current live roster **Old** via **Rename** (Edit Roster →
-   Configuration → Old).
-2. Create a **+ New Roster** per new battalion, tagged **New**.
-3. In each new roster, use **+ Import Company** to pull in whichever old
-   companies (or B/ACD) are being folded into it, then drag troopers between
-   panes to actually divide them up — the **Change Log** will show exactly
-   where each person came from.
+**2. Review leadership.** The planner breaks each battalion's tagged group
+into **Officers / Senior NCOs / Junior NCOs / Troopers** (click a tier to
+see names). Each tier is labeled with the billets it can fill — officers
+for CO/XO/Platoon Leader, senior NCOs for SGM/1SG/Platoon Sergeant, junior
+NCOs for Squad Leader. If a battalion shows a red **0** in a leadership
+tier, it can't fill those billets yet — re-balance your tags before moving
+on.
 
-The Battalion Roster tab's badge always tells you which one you're looking
-at, so it's hard to mix them up mid-reorg.
+**3. Commit the split.** Click **Commit Split** to generate the `HLLV` and
+`HLLWW2` rosters. Each starts as an *empty battalion* — no companies, HQ
+vacant — with everyone tagged for it waiting in its Unassigned pool, sorted
+by rank. Deliberately no old structure carried over: you build the new
+battalion around the leadership you actually have, rather than reshaping
+2-7's layout. Safe to re-run as tags change — it updates the same two
+rosters rather than duplicating them.
+
+**4. Build the battalions.** The planner tracks each battalion's progress
+(HQ filled, companies created, company leadership filled, troopers still in
+the pool) and gives you an **Open in Drag & Drop** button per battalion.
+Build order: drag your Battalion CO/XO/SGM out of the pool onto Battalion
+HQ first, then **+ Add Company** for each company you have leadership for,
+fill its CO/XO/1SG, and work down through platoons and squads.
+
+The split toggles only appear on the source roster — rosters tagged **New**
+(the split's outputs) hide them, and the Battalion Roster tab's badge always
+tells you which one you're looking at. The older manual path (creating
+rosters yourself and using **+ Import Company** / **+ Import Trooper**)
+still works too and can be mixed in freely.
 
 ## Typical workflows
 
@@ -234,9 +248,10 @@ Revert Changes to back out before saving.
 + Add Company to lay out your structure, + Import Trooper or + Import Company
 to pull in real people, and drag them into place.
 
-**Splitting the battalion into two:** see [Tagging Old vs. New](#tagging-old-vs-new-battalion-split)
-above — tag each trooper N/HLLV/HLLWW2 and click Commit Split, or do it
-manually with Import Company/Trooper into rosters you create yourself.
+**Splitting the battalion into two:** open the **Split Planner** tab and
+follow its four phases — tag everyone N/HLLV/HLLWW2, review each group's
+leadership, Commit Split, then build each battalion up from its pool. See
+[Splitting the battalion](#splitting-the-battalion-split-planner) above.
 
 **Cleaning up the history:** if a test move or mis-click got saved to the
 Change Log, open the Change Log panel and Delete that specific entry, or

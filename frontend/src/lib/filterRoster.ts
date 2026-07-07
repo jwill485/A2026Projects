@@ -1,20 +1,33 @@
-import type { Company, Platoon, Soldier, Squad } from "../types/roster";
+import type { Company, Platoon, Soldier, SplitStatus, Squad } from "../types/roster";
 
 export interface RosterFilter {
   text: string;
   rank: string;
   mos: string;
+  // "" = any; otherwise only troopers whose split tag matches (unset counts as "neutral").
+  splitTag: "" | SplitStatus;
   vacantOnly: boolean;
 }
 
-export const EMPTY_FILTER: RosterFilter = { text: "", rank: "", mos: "", vacantOnly: false };
+export const EMPTY_FILTER: RosterFilter = {
+  text: "",
+  rank: "",
+  mos: "",
+  splitTag: "",
+  vacantOnly: false,
+};
 
 export function isFilterActive(filter: RosterFilter): boolean {
-  return filter.text.trim() !== "" || filter.rank.trim() !== "" || filter.mos.trim() !== "" || filter.vacantOnly;
+  return hasSoldierCriteria(filter) || filter.vacantOnly;
 }
 
 function hasSoldierCriteria(filter: RosterFilter): boolean {
-  return filter.text.trim() !== "" || filter.rank.trim() !== "" || filter.mos.trim() !== "";
+  return (
+    filter.text.trim() !== "" ||
+    filter.rank.trim() !== "" ||
+    filter.mos.trim() !== "" ||
+    filter.splitTag !== ""
+  );
 }
 
 export function matchesSoldier(soldier: Soldier, filter: RosterFilter): boolean {
@@ -25,6 +38,7 @@ export function matchesSoldier(soldier: Soldier, filter: RosterFilter): boolean 
   }
   if (filter.rank && soldier.rankShort !== filter.rank) return false;
   if (filter.mos && soldier.mos !== filter.mos) return false;
+  if (filter.splitTag && (soldier.splitStatus ?? "neutral") !== filter.splitTag) return false;
   return true;
 }
 

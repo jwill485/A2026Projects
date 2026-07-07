@@ -43,12 +43,13 @@ import { OrgChart } from "./components/OrgChart";
 import { RosterListView } from "./components/RosterListView";
 import { RosterFilterBar } from "./components/RosterFilterBar";
 import { EMPTY_FILTER, type RosterFilter } from "./lib/filterRoster";
-import { buildSplitRoster } from "./lib/splitReorg";
+import { buildSplitRoster, SPLIT_GROUPS } from "./lib/splitReorg";
+import { SplitPlanner } from "./components/SplitPlanner";
 import type { Company, RosterData, Soldier, SplitStatus } from "./types/roster";
 import type { ApiRankExpanded } from "./types/api";
 import "./App.css";
 
-type Tab = "roster" | "dragdrop" | "analytics";
+type Tab = "roster" | "dragdrop" | "split" | "analytics";
 type RosterView = "tree" | "orgchart" | "list";
 
 function App() {
@@ -61,7 +62,7 @@ function App() {
   const [ranks, setRanks] = useState<ApiRankExpanded[] | null>(null);
   const [rankOrder, setRankOrder] = useState<Map<string, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("roster");
+  const [tab, setTab] = useState<Tab>("split");
   const [rosterView, setRosterView] = useState<RosterView>("tree");
   const [rosterFilter, setRosterFilter] = useState<RosterFilter>(EMPTY_FILTER);
 
@@ -193,18 +194,15 @@ function App() {
     if (!roster) return;
     if (
       !window.confirm(
-        "Generate/update the HLLV and HLLWW2 rosters from each trooper's current split-status tag? " +
-          "If those rosters already exist, their contents will be replaced.",
+        "Commit the split? Everyone tagged HLLV or HLLWW2 lands in that battalion's Unassigned pool " +
+          "(sorted by rank) under an empty battalion, ready for you to build structure around. " +
+          "If the HLLV/HLLWW2 rosters already exist, their contents are replaced.",
       )
     ) {
       return;
     }
-    const destinations: { name: string; status: SplitStatus }[] = [
-      { name: "HLLV", status: "hllv" },
-      { name: "HLLWW2", status: "hllww2" },
-    ];
-    for (const { name, status } of destinations) {
-      const built = buildSplitRoster(roster, status);
+    for (const { name, status } of SPLIT_GROUPS) {
+      const built = buildSplitRoster(roster, status, name, rankOrder ?? undefined);
       const existing = rosterList.find((r) => r.name === name);
       if (existing) {
         saveRoster(existing.id, built);
@@ -217,6 +215,18 @@ function App() {
     }
     setRosterList(listRosters());
     window.alert("HLLV and HLLWW2 rosters have been generated/updated.");
+  }
+
+  function handleOpenRosterBuild(id: string) {
+    activateRoster(id);
+    setTab("dragdrop");
+  }
+
+  function handleStartSorting() {
+    // Pre-set the filter to undecided troopers so the tree acts as a work
+    // queue: people disappear from view as they get tagged.
+    setRosterFilter({ ...EMPTY_FILTER, splitTag: "neutral" });
+    setTab("roster");
   }
 
   function handleRefresh() {
@@ -307,6 +317,16 @@ function App() {
 
   const pendingChanges = diffRosters(baseline, roster).length;
   const activeConfiguration = rosterList.find((r) => r.id === rosterId)?.configuration;
+  // Tagging only makes sense on the split's *source* roster — hide the
+  // toggles entirely on rosters that are themselves split outputs.
+  const splitStatusHandler = activeConfiguration === "new" ? undefined : handleSetSplitStatus;
+  // The default pool wording is about B/ACD, which is wrong for a split
+  // output where the pool holds this battalion's committed-but-unplaced troopers.
+  const poolTitle = activeConfiguration === "new" ? "Pool" : undefined;
+  const poolHint =
+    activeConfiguration === "new"
+      ? "Troopers committed to this battalion, sorted by rank — assign Battalion HQ first, then build companies around your leadership (see Split Planner)."
+      : undefined;
   const mosOptions = [...new Set(collectAllSoldiers(roster).map((s) => s.mos))]
     .filter((mos) => mos.trim() !== "")
     .sort();
@@ -329,6 +349,9 @@ function App() {
           </button>
           <button className={tab === "dragdrop" ? "active" : ""} onClick={() => setTab("dragdrop")}>
             Drag &amp; Drop
+          </button>
+          <button className={tab === "split" ? "active" : ""} onClick={() => setTab("split")}>
+            Split Planner
           </button>
           <button
             className={tab === "analytics" ? "active" : ""}
@@ -392,9 +415,6 @@ function App() {
             >
               {rosterView === "list" ? "Hide Roster List" : "Print Roster"}
             </button>
-            <button className="add-btn" onClick={handleCommitSplit}>
-              Commit Split
-            </button>
           </div>
           {rosterView === "orgchart" && pendingChanges === 0 ? (
             <OrgChart battalion={roster.battalion} unassigned={roster.unassigned} />
@@ -405,12 +425,14 @@ function App() {
               <RosterTree
                 battalion={roster.battalion}
                 filter={rosterFilter}
-                onSetSplitStatus={handleSetSplitStatus}
+                onSetSplitStatus={splitStatusHandler}
               />
               <UnassignedPool
                 group={roster.unassigned}
                 filter={rosterFilter}
-                onSetSplitStatus={handleSetSplitStatus}
+                onSetSplitStatus={splitStatusHandler}
+                title={poolTitle}
+                hint={poolHint}
               />
             </>
           )}
@@ -428,8 +450,20 @@ function App() {
           onDeleteSoldier={handleDeleteSoldier}
           onImportSoldier={handleImportSoldier}
           onImportCompany={handleImportCompany}
-          onSetSplitStatus={handleSetSplitStatus}
+          onSetSplitStatus={splitStatusHandler}
           filter={rosterFilter}
+          unassignedHint={poolHint}
+        />
+      )}
+      {tab === "split" && (
+        <SplitPlanner
+          roster={roster}
+          rosterList={rosterList}
+          activeConfiguration={activeConfiguration}
+          loadRosterData={loadRoster}
+          onCommitSplit={handleCommitSplit}
+          onOpenRoster={handleOpenRosterBuild}
+          onStartSorting={handleStartSorting}
         />
       )}
       {tab === "analytics" && <AnalyticsTab roster={roster} />}

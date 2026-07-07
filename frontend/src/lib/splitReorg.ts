@@ -1,48 +1,51 @@
-import type { Battalion, Company, Platoon, RosterData, Soldier, SplitStatus, Squad } from "../types/roster";
+import type { RosterData, Soldier, SplitStatus } from "../types/roster";
+import { makeBattalion, makeCompany } from "./rosterFactory";
+import { collectAllSoldiers } from "./analytics";
 
-function keep(soldier: Soldier | null, status: SplitStatus): Soldier | null {
-  return soldier && soldier.splitStatus === status ? soldier : null;
-}
+// The two battalions 2-7 is splitting into. Roster names double as battalion
+// designations in the generated rosters.
+export const SPLIT_GROUPS: { name: string; status: SplitStatus }[] = [
+  { name: "HLLV", status: "hllv" },
+  { name: "HLLWW2", status: "hllww2" },
+];
 
-function buildSquad(squad: Squad, status: SplitStatus): Squad {
-  return {
-    number: squad.number,
-    leader: keep(squad.leader, status),
-    members: squad.members.filter((m) => m.splitStatus === status),
-  };
-}
+// Builds a new battalion roster for one side of the split. Deliberately does
+// NOT carry over the old company/platoon/squad structure: the guided flow is
+// "sort people first, then construct companies around the leadership you
+// actually have", so everyone tagged for this battalion lands in the
+// Unassigned pool (sorted by rank) under an otherwise-empty battalion, and
+// their split tag is cleared — the tag's job is done once they're committed.
+export function buildSplitRoster(
+  source: RosterData,
+  status: SplitStatus,
+  designation: string,
+  rankOrder?: Map<string, number>,
+): RosterData {
+  const troopers: Soldier[] = collectAllSoldiers(source)
+    .filter((s) => s.splitStatus === status)
+    .map((s) => {
+      const copy: Soldier = structuredClone(s);
+      delete copy.splitStatus;
+      return copy;
+    });
 
-function buildPlatoon(platoon: Platoon, status: SplitStatus): Platoon {
-  return {
-    number: platoon.number,
-    leader: keep(platoon.leader, status),
-    sergeant: keep(platoon.sergeant, status),
-    squads: platoon.squads.map((s) => buildSquad(s, status)),
-  };
-}
+  troopers.sort((a, b) => {
+    const orderA = rankOrder?.get(a.rankId) ?? Number.MAX_SAFE_INTEGER;
+    const orderB = rankOrder?.get(b.rankId) ?? Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.realName.localeCompare(b.realName);
+  });
 
-function buildCompany(company: Company, status: SplitStatus): Company {
-  return {
-    letter: company.letter,
-    name: company.name,
-    commander: keep(company.commander, status),
-    executiveOfficer: keep(company.executiveOfficer, status),
-    firstSergeant: keep(company.firstSergeant, status),
-    platoons: company.platoons.map((p) => buildPlatoon(p, status)),
-  };
-}
+  const unassigned = makeCompany("UNASSIGNED", "Unassigned");
+  if (troopers.length > 0) {
+    // Same holding platoon/squad convention as addSoldierToCompany.
+    unassigned.platoons.push({
+      number: "0",
+      leader: null,
+      sergeant: null,
+      squads: [{ number: "0", leader: null, members: troopers }],
+    });
+  }
 
-// Builds a new roster containing only the troopers tagged for the given
-// split destination, preserving the full company/platoon/squad structure
-// (untagged slots come through vacant) so the shape of the new battalion is
-// visible even before everyone's been decided.
-export function buildSplitRoster(source: RosterData, status: SplitStatus): RosterData {
-  const battalion: Battalion = {
-    designation: source.battalion.designation,
-    commander: keep(source.battalion.commander, status),
-    executiveOfficer: keep(source.battalion.executiveOfficer, status),
-    sergeantMajor: keep(source.battalion.sergeantMajor, status),
-    companies: source.battalion.companies.map((c) => buildCompany(c, status)),
-  };
-  return { battalion, unassigned: buildCompany(source.unassigned, status) };
+  return { battalion: makeBattalion(designation, []), unassigned };
 }

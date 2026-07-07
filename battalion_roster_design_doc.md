@@ -118,22 +118,42 @@ Configuration"** badge based on the active roster's tag, so it's always
 clear which one is in view. See [§8.1](#81-battalion-split-2-7--two-battalions)
 for the fuller history of this decision.
 
-Two ways to actually populate the new rosters, usable independently or
-together:
-- **Manual**: break down the old companies via Import Company/Import
-  Trooper into a roster you've already created for the new battalion.
-- **Decision tagging + Commit Split**: every trooper gets a small **N /
-  HLLV / HLLWW2** toggle (next to their name on both the Battalion Roster
-  tree and Drag & Drop) to mark them Neutral (undecided) or assigned to one
-  of the two new battalions — right on the *existing* live roster, so you
-  can see who's still undecided as you go (pairs naturally with the
-  **Vacant leadership only**-style filtering in [§2.12](#212-search--filter)).
-  Tagging doesn't count as a "pending change" (it's not part of
-  `diffRosters`), so it never blocks Save/Org Chart/etc. Once decided,
-  **Commit Split** reads every tag and generates (or, if run again,
-  overwrites) the two `HLLV`/`HLLWW2` rosters — full company/platoon/squad
-  structure carried over, with untagged slots left vacant so the shape of
-  each new battalion is visible even before every billet is decided.
+The split is driven by a guided, four-phase workflow on the **Split
+Planner** tab (`SplitPlanner.tsx`) — the app's default landing tab — soft
+guidance with progress tracking, not a locked wizard; every other tool
+stays usable throughout:
+
+1. **Sort** — every trooper gets a small **N / HLLV / HLLWW2** toggle (next
+   to their name on both the Battalion Roster tree and Drag & Drop) marking
+   them Neutral (undecided) or assigned to one of the two new battalions,
+   right on the *existing* live roster. Tagging doesn't count as a "pending
+   change" (it's not part of `diffRosters`), so it never blocks
+   Save/Org Chart/etc. The phase card's **Start sorting (N to go)** button
+   jumps to the Battalion Roster tree with the filter bar's **split tag**
+   dropdown (see [§2.12](#212-search--filter)) pre-set to Neutral, turning
+   the tree into a work queue — troopers drop out of view as they're tagged.
+   The toggles are hidden entirely on rosters tagged **New** — tagging only
+   means something on the source roster.
+2. **Review leadership** — the planner buckets each battalion's tagged pool
+   into **Officers / Senior NCOs / Junior NCOs / Troopers** (classified by
+   rank in `leadership.ts`), each annotated with the billets that tier
+   feeds (officers → CO/XO/PL, senior NCOs → SGM/1SG/PSG, junior NCOs →
+   Squad Leader). A zero in a leadership tier is flagged red — the cue to
+   re-balance tags before committing.
+3. **Commit Split** — generates (or, on re-run, overwrites) the two
+   `HLLV`/`HLLWW2` rosters. Deliberately does **not** carry the old 2-7
+   structure over: each new roster is an **empty battalion** (designation =
+   battalion name, HQ vacant, no companies) with everyone tagged for it in
+   the Unassigned pool, sorted by rank, split tags cleared. Structure gets
+   built deliberately in phase 4 around the leadership actually available.
+4. **Build** — per battalion, the planner tracks HQ fill (x/3), companies
+   created, company-leadership fill, and pool remaining, with an **Open in
+   Drag & Drop** button that switches roster + tab in one click. Intended
+   order: Battalion CO/XO/SGM first, then + Add Company per company you
+   have leadership for, then platoons/squads down from there.
+
+The older manual path (Import Company/Import Trooper into hand-created
+rosters) still works and can be mixed in freely.
 
 ### 2.10 Org Chart View
 On the Battalion Roster tab, **Generate Org Chart** swaps the text tree for a
@@ -165,7 +185,8 @@ and Drag & Drop tabs, sharing one filter state across them: a name search
 box, a **Rank** dropdown and a **MOS** dropdown (both fixed lists — rank
 from the same master rank list used everywhere else, MOS from the distinct
 values actually present in the active roster — rather than free-text typing),
-and a **Vacant leadership only** toggle. Matching troopers/vacant slots are
+a **split tag** dropdown (Any / Neutral / HLLV / HLLWW2, for working through
+the sort phase of §2.9), and a **Vacant leadership only** toggle. Matching troopers/vacant slots are
 highlighted; companies, platoons, and squads with no match anywhere inside
 them are hidden entirely rather than just collapsed, since every tree node
 in this app is always expanded by default. Filtering is purely visual —
@@ -257,16 +278,19 @@ Top of the page, three boxed groups side by side:
 ```
 ┌─────────────────┐  ┌───────────────────────────────┐  ┌───────────────────────────────────────┐
 │ [Roster ▾] [+New]│  │ [Battalion Roster] [Drag&Drop]│  │ [Refresh][Save][Revert][Change Log(N)] │
-│ [Rename][Delete] │  │ [Analytics]                   │  │                                         │
+│ [Rename][Delete] │  │ [Split Planner] [Analytics]   │  │                                         │
 └─────────────────┘  └───────────────────────────────┘  └─────────────────────────────────────────┘
 ```
 
-Below that, whichever tab is active:
+Below that, whichever tab is active (Battalion Roster and Drag & Drop also
+get the shared filter bar, §2.12):
 - **Battalion Roster** — optional Old/New badge, then the read-only tree +
   Unassigned pool.
 - **Drag & Drop** — Battalion HQ, the Other/Building pane selectors, the
   Add Company / Add Trooper / Import Trooper / Import Company buttons, then
   the two Kanban panes side by side.
+- **Split Planner** — the four guided split phases (§2.9): sort progress,
+  leadership review, Commit Split, per-battalion build tracking.
 - **Analytics** — the "Show as tables" toggle, then the four charts/reports.
 
 The whole app uses a fixed dark theme (`#000` background) with a gold/blue
@@ -421,10 +445,10 @@ top of Multiple Named Rosters (§2.1/§2.9) rather than restructuring
 `RosterData` — no data-model change needed, since every roster already has
 exactly one battalion, which is precisely what each split-off battalion is.
 The supporting tooling (roster tagging/badge, whole-company import, the
-per-trooper N/HLLV/HLLWW2 decision tag, and **Commit Split** to generate
-the two new rosters from those tags — see §2.9) is done; the actual reorg
-work (deciding who goes where) is ongoing, separate work using that
-tooling.
+per-trooper N/HLLV/HLLWW2 decision tag, and the guided four-phase **Split
+Planner** with leadership review and Commit Split — see §2.9) is done; the
+actual reorg work (deciding who goes where, then building each battalion's
+structure) is ongoing, separate work using that tooling.
 
 Built on a separate git branch (`battalion-split`), per the original decision
 to keep `master` stable while this was worked out.
@@ -494,11 +518,12 @@ Repo layout:
 - `backend/app/main.py` — the FastAPI proxy (three read-only endpoints).
 - `frontend/src/lib/` — pure data logic: `buildRoster.ts` (live-API →
   `RosterData`), `moveSoldier.ts` (all mutations, including the split-status
-  patch), `splitReorg.ts` (Commit Split roster generation), `filterRoster.ts`
+  patch), `splitReorg.ts` (Commit Split pool-roster generation),
+  `leadership.ts` (rank → leadership-tier classification), `filterRoster.ts`
   (search/filter matching), `persistence.ts` (localStorage), `changelog.ts`,
   `analytics.ts`.
 - `frontend/src/components/` — UI: `RosterTree`/`DragDropTree`/`OrgChart`/
-  `RosterListView` (the four roster views), `RosterFilterBar`,
+  `RosterListView` (the four roster views), `SplitPlanner`, `RosterFilterBar`,
   `SplitStatusToggle`, `RosterPicker`, `SoldierForm`,
   `ImportSoldierPicker`/`ImportCompanyPicker`, `AnalyticsTab`, `ChangeLogPanel`.
 
