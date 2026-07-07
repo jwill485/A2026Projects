@@ -1,8 +1,10 @@
+import { useRef, useState } from "react";
 import type { RosterData, Soldier } from "../types/roster";
 import type { RosterSummary } from "../lib/persistence";
 import { collectAllSoldiers, collectCompanySoldiers, computeLeadershipFillByCompany } from "../lib/analytics";
 import { bucketByTier, TIER_BILLETS, TIER_LABELS, TIER_ORDER } from "../lib/leadership";
 import { SPLIT_GROUPS } from "../lib/splitReorg";
+import { parseSplitTagCsv, type SplitTagImportResult, type SplitTagRow } from "../lib/splitTagImport";
 import "./SplitPlanner.css";
 
 type PhaseState = "done" | "active" | "todo";
@@ -47,6 +49,7 @@ export function SplitPlanner({
   onCommitSplit,
   onOpenRoster,
   onStartSorting,
+  onImportSplitTags,
 }: {
   roster: RosterData;
   rosterList: RosterSummary[];
@@ -55,7 +58,43 @@ export function SplitPlanner({
   onCommitSplit: () => void;
   onOpenRoster: (id: string) => void;
   onStartSorting: () => void;
+  onImportSplitTags: (rows: SplitTagRow[]) => SplitTagImportResult | null;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importSummary, setImportSummary] = useState<string[] | null>(null);
+
+  function handleTagFile(file: File) {
+    file.text().then((text) => {
+      const { rows, badLines } = parseSplitTagCsv(text);
+      const lines: string[] = [];
+      if (rows.length === 0) {
+        lines.push(
+          "No usable lines found. Expected two columns per line: trooper (username or real name), then N, HLLV, or HLLWW2.",
+        );
+      } else {
+        const result = onImportSplitTags(rows);
+        if (!result) return;
+        lines.push(`${result.applied} tag${result.applied === 1 ? "" : "s"} applied.`);
+        if (result.notFound.length > 0) {
+          lines.push(`Not on this roster (skipped): ${result.notFound.join(", ")}`);
+        }
+        if (result.ambiguous.length > 0) {
+          lines.push(
+            `Name matches more than one trooper — use their username instead: ${result.ambiguous.join(", ")}`,
+          );
+        }
+      }
+      if (badLines.length > 0) {
+        lines.push(
+          `Unreadable line${badLines.length === 1 ? "" : "s"} (skipped): ${badLines
+            .map((b) => `#${b.line} "${b.text}"`)
+            .join(", ")}`,
+        );
+      }
+      setImportSummary(lines);
+    });
+  }
+
   const everyone = collectAllSoldiers(roster);
   const groups = SPLIT_GROUPS.map((g) => ({
     ...g,
@@ -122,10 +161,35 @@ export function SplitPlanner({
           ))}
           <span className="sort-count sort-total">{everyone.length} total</span>
         </div>
-        {neutralCount > 0 && activeConfiguration !== "new" && (
-          <button className="add-btn start-sorting-btn" onClick={onStartSorting}>
-            Start sorting ({neutralCount} to go) →
-          </button>
+        {activeConfiguration !== "new" && (
+          <div className="sort-actions">
+            {neutralCount > 0 && (
+              <button className="add-btn start-sorting-btn" onClick={onStartSorting}>
+                Start sorting ({neutralCount} to go) →
+              </button>
+            )}
+            <button className="add-btn" onClick={() => fileInputRef.current?.click()}>
+              Import tags from CSV…
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.txt,text/csv,text/plain"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleTagFile(file);
+                e.target.value = ""; // allow re-selecting the same file
+              }}
+            />
+          </div>
+        )}
+        {importSummary && (
+          <div className="import-summary">
+            {importSummary.map((line, i) => (
+              <p key={i}>{line}</p>
+            ))}
+          </div>
         )}
       </section>
 

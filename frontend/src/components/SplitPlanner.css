@@ -215,9 +215,33 @@
   font-weight: 600;
 }
 
-.start-sorting-btn {
+.sort-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 0.6rem;
+}
+
+.sort-actions .add-btn {
+  margin: 0;
+}
+
+.start-sorting-btn {
   font-weight: 600;
+}
+
+.import-summary {
+  margin-top: 0.6rem;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  background: #181818;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  color: #ccc;
+}
+
+.import-summary p {
+  margin: 0.2rem 0;
 }
 
 .build-stats {

@@ -140,7 +140,15 @@ stays usable throughout:
    jumps to the Battalion Roster tree with the filter bar's **split tag**
    dropdown (see [§2.12](#212-search--filter)) pre-set to Neutral, turning
    the tree into a work queue — troopers drop out of view as they're tagged.
-   The toggles are hidden entirely on rosters tagged **New** — tagging only
+   Tags can also be bulk-applied from a file via **Import tags from CSV…**
+   on the same phase card (`splitTagImport.ts`): two columns per line —
+   trooper, then `N`/`HLLV`/`HLLWW2` — split on comma/semicolon/tab, extra
+   columns ignored, a non-matching first line skipped as a header. Troopers
+   are matched by username first (the unique MILPACS handle), then by real
+   name as a fallback; a real name shared by several troopers is skipped as
+   ambiguous rather than guessed at. An inline summary reports applied /
+   not-found / ambiguous / unreadable lines. The toggles (and the import
+   button) are hidden entirely on rosters tagged **New** — tagging only
    means something on the source roster.
 2. **Review leadership** — the planner buckets each battalion's tagged pool
    into **Officers / Senior NCOs / Junior NCOs / Troopers** (classified by
@@ -186,6 +194,22 @@ opening the view adds a class to `<html>` that a `@media print` rule keys off
 of to hide the nav/tabs/buttons, so printing (or Save as PDF) from the
 browser produces a clean battalion roster page rather than the app chrome.
 Clicking **Hide Roster List** returns to the tree view.
+
+A toolbar (screen-only — hidden by the same print rule) narrows what the
+list shows, and both the printout and the CSV export honor it:
+
+- **Show** — whole battalion, a single company, or the Unassigned pool.
+- **Who** — Everyone / Officers & NCOs only / Officers only / NCOs only,
+  classified by the same rank tiers as the Split Planner (`leadership.ts`).
+  In a scope-filtered view, empty slots are dropped rather than printed as
+  VACANT (the occupant didn't match the filter — the billet isn't vacant),
+  and squads/platoons/companies left with nobody matching are pruned
+  entirely, so a filtered print reads as "these people, organized by unit"
+  (`rosterExport.ts`).
+- **Download CSV** — direct file download (no print dialog) of exactly
+  what's on screen, one row per person: Company, Platoon, Squad, Billet,
+  Rank, Name, Username, MOS. The filename encodes the active filters
+  (e.g. `2-7-A-leadership-roster.csv`).
 
 ### 2.12 Search & Filter
 A filter bar (`RosterFilterBar.tsx`) sits above both the Battalion Roster
@@ -481,16 +505,13 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 
 ### 8.3 Other Not-Yet-Built Ideas
 
-- **Bulk-import split tags from a file:** upload a CSV/spreadsheet mapping
-  trooper → N/HLLV/HLLWW2 to bulk-apply split-status tags (§2.9 phase 1),
-  instead of clicking the toggle one person at a time — useful if the
-  sorting decision gets made offline (e.g. in a spreadsheet) rather than
-  live in the app.
-- **Export/report:** *(Partially built)* [§2.11](#211-roster-list--print-view)
-  covers a whole-battalion list view with browser print/Save-as-PDF support.
-  Still missing: a per-company or officer/NCO-only filtered view, and any
-  export that doesn't go through the browser's own print dialog (e.g. a
-  direct file download).
+- **Personnel query tab:** a separate tab for querying MILPACS profile data
+  about troopers in 2-7 and B/ACD — graduations, disciplinary records,
+  awards, secondary billets, ranks, and MOS. The full (non-lite) roster
+  endpoint already returns all of this per profile (`records[]` with
+  `recordType` GRADUATION/DISCIPLINARY/etc., `awards[]`, `secondaries[]`,
+  `mos`, `rank`), so this is a frontend query/filter UI plus a printable
+  list output (same print approach as §2.11).
 - **Rank/MOS validation:** flag rank-inappropriate or MOS-mismatched billet
   assignments.
 - **Notes/flags:** per-trooper notes (medical, discipline, promotion review).

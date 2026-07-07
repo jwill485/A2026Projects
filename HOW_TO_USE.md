@@ -79,9 +79,17 @@ viewing) and the **action buttons** (things you can do). The tabs are:
   on a squad to expand just that one, or use **Expand All** / **Collapse
   All** above the chart. A **Print Roster** button swaps the tree for a flat,
   indented list of the whole battalion (one line per billet) — unlike the
-  org chart, it works even with unsaved changes. Use your browser's Print
-  (or Save as PDF) while it's open for a clean printout without the app's
-  nav/buttons; click **Hide Roster List** to go back to the tree.
+  org chart, it works even with unsaved changes. A toolbar above the list
+  narrows it down: **Show** picks the whole battalion, a single company, or
+  the Unassigned pool, and **Who** picks Everyone / Officers & NCOs only /
+  Officers only / NCOs only (filtered views drop empty slots and units with
+  nobody matching, so you get a clean leadership list rather than a page of
+  VACANTs). Use your browser's Print (or Save as PDF) while it's open for a
+  clean printout without the app's nav/buttons or the toolbar — the printout
+  matches whatever filters you've picked. **Download CSV** saves the same
+  filtered list straight to a spreadsheet-ready file (Company, Platoon,
+  Squad, Billet, Rank, Name, Username, MOS) with no print dialog involved.
+  Click **Hide Roster List** to go back to the tree.
 - **Drag & Drop** — the same structure, but editable: drag troopers between
   billets, add companies/platoons/squads, and add/edit/delete/import
   troopers and whole companies.
@@ -214,6 +222,25 @@ available on Drag & Drop) to mark them Neutral (undecided) or assigned to
 one of the two new battalions. Tagging doesn't touch Save/Revert or the
 Change Log — it's a lightweight decision layer you can leave half-finished
 and come back to. The planner shows a running count of undecided vs. tagged.
+
+If the sorting decision was made offline (say, in a spreadsheet), skip the
+clicking: **Import tags from CSV…** on the same phase card applies tags in
+bulk from a file. Two columns per line — the trooper, then `N`, `HLLV`, or
+`HLLWW2` (comma, semicolon, or tab separated; a header line is fine):
+
+```
+Trooper,Tag
+Cameron.J,HLLV
+Doe.J,HLLWW2
+Smith.A,N
+```
+
+Usernames (like `Cameron.J`) are the safest way to name people, but real
+names work too — if a real name matches more than one trooper it's skipped
+and reported so you can switch that line to the username. After the import,
+a summary lists how many tags applied plus anyone not found and any lines
+it couldn't read. Re-importing a corrected file is always safe — later tags
+just overwrite earlier ones.
 
 **2. Review leadership.** The planner breaks each battalion's tagged group
 into **Officers / Senior NCOs / Junior NCOs / Troopers** (click a tier to

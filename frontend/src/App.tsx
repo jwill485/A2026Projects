@@ -44,6 +44,7 @@ import { RosterListView } from "./components/RosterListView";
 import { RosterFilterBar } from "./components/RosterFilterBar";
 import { EMPTY_FILTER, type RosterFilter } from "./lib/filterRoster";
 import { buildSplitRoster, SPLIT_GROUPS } from "./lib/splitReorg";
+import { applySplitTags, type SplitTagImportResult, type SplitTagRow } from "./lib/splitTagImport";
 import { SplitPlanner } from "./components/SplitPlanner";
 import type { Company, RosterData, Soldier, SplitStatus } from "./types/roster";
 import type { ApiRankExpanded } from "./types/api";
@@ -188,6 +189,13 @@ function App() {
   function handleSetSplitStatus(userId: string, status: SplitStatus) {
     if (!roster) return;
     handleChange(updateSoldier(roster, userId, { splitStatus: status }));
+  }
+
+  function handleImportSplitTags(rows: SplitTagRow[]): SplitTagImportResult | null {
+    if (!roster) return null;
+    const result = applySplitTags(roster, rows);
+    if (result.applied > 0) handleChange(result.roster);
+    return result;
   }
 
   function handleCommitSplit() {
@@ -464,6 +472,7 @@ function App() {
           onCommitSplit={handleCommitSplit}
           onOpenRoster={handleOpenRosterBuild}
           onStartSorting={handleStartSorting}
+          onImportSplitTags={handleImportSplitTags}
         />
       )}
       {tab === "analytics" && <AnalyticsTab roster={roster} />}
