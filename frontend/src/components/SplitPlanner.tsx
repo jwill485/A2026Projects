@@ -10,8 +10,9 @@ import {
 } from "../lib/analytics";
 import { bucketByTier, TIER_BILLETS, TIER_LABELS, TIER_ORDER } from "../lib/leadership";
 import { INTACT_TRANSFER, SPLIT_GROUPS } from "../lib/splitReorg";
-import { STRUCTURE_RULES, suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
+import { suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
 import { parseSplitTagCsv, type SplitTagImportResult, type SplitTagRow } from "../lib/splitTagImport";
+import { SuggestionPreview } from "./SuggestionPreview";
 import "./SplitPlanner.css";
 
 type PhaseState = "done" | "active" | "todo";
@@ -494,59 +495,14 @@ export function SplitPlanner({
                     </li>
                     <li className={b.poolLeft === 0 ? "stat-done" : ""}>Still in pool: {b.poolLeft}</li>
                   </ul>
-                  {suggestions.length > 0 && (
-                    <details className="suggestion-block">
-                      <summary>
-                        💡 Suggested structure — {suggestions.length}{" "}
-                        {suggestions.length === 1 ? "company" : "companies"} from practice times
-                      </summary>
-                      <p className="suggestion-hint">
-                        Old squads kept intact, grouped into companies by practice time, sized to
-                        {" "}{b.name === "HLLV" ? "HLLV's" : "HLLWW2's"} structure standards (min{" "}
-                        {STRUCTURE_RULES[b.status]?.minSquadsPerPlatoon} squads/platoon, min{" "}
-                        {STRUCTURE_RULES[b.status]?.minPlatoonsPerCompany} platoons/company, max{" "}
-                        {STRUCTURE_RULES[b.status]?.maxCompanies} compan
-                        {STRUCTURE_RULES[b.status]?.maxCompanies === 1 ? "y" : "ies"}) and checked
-                        against available leadership. Applying places the squads and leaves every
-                        leadership billet vacant for you to fill.
-                      </p>
-                      {suggestionWarnings.length > 0 && (
-                        <ul className="suggestion-warnings">
-                          {suggestionWarnings.map((w) => (
-                            <li key={w}>{w}</li>
-                          ))}
-                        </ul>
-                      )}
-                      {suggestions.map((sc) => (
-                        <div key={sc.letter} className="suggestion-company">
-                          <h5>
-                            {sc.name} Company ({sc.letter}) — {sc.practiceTimes.join(" · ")} ·{" "}
-                            {sc.headcount} troopers
-                          </h5>
-                          {sc.platoons.map((sp) => (
-                            <div key={sp.number} className="suggestion-platoon">
-                              Platoon {sp.number}
-                              <ul>
-                                {sp.squads.map((ss) => (
-                                  <li key={ss.sourceLabel}>
-                                    from {ss.sourceLabel} —{" "}
-                                    {(ss.leader ? 1 : 0) + ss.members.length} troopers ·{" "}
-                                    {ss.mos.map((m) => `${m.label} ×${m.value}`).join(" · ")}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                      <button
-                        className="add-btn"
-                        onClick={() => onApplySuggestion(b.summary!.id, suggestions)}
-                      >
-                        Apply suggested structure to {b.name}
-                      </button>
-                    </details>
-                  )}
+                  <SuggestionPreview
+                    battalionName={b.name}
+                    status={b.status}
+                    suggestions={suggestions}
+                    warnings={suggestionWarnings}
+                    onApply={() => onApplySuggestion(b.summary!.id, suggestions)}
+                    applyLabel={`Apply suggested structure to ${b.name}`}
+                  />
                   <button className="add-btn" onClick={() => onOpenRoster(b.summary!.id)}>
                     Open {b.name} in Drag &amp; Drop
                   </button>

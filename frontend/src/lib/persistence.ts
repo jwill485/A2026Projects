@@ -31,6 +31,11 @@ export interface RosterSummary {
   // configuration, for the Battalion Roster tab's viewing-context badge.
   // Untagged for rosters unrelated to the split.
   configuration?: RosterConfiguration;
+  // For a split-output roster (HLLV/HLLWW2): the id of the roster that was
+  // active when Commit Split created/refreshed it — lets Drag & Drop's
+  // "Suggest structure" find the tagged source roster deterministically,
+  // rather than guessing from the (optional, user-set) configuration tag.
+  splitSourceId?: string;
 }
 
 function loadJson<T>(key: string): T | null {
@@ -105,13 +110,14 @@ export function createRoster(
   roster: RosterData,
   baseline: RosterData = roster,
   configuration?: RosterConfiguration,
+  splitSourceId?: string,
 ): string {
   const id = crypto.randomUUID();
   saveRoster(id, roster);
   saveBaseline(id, baseline);
   saveChangeLog(id, []);
   const index = listRosters();
-  index.push({ id, name, updatedAt: new Date().toISOString(), configuration });
+  index.push({ id, name, updatedAt: new Date().toISOString(), configuration, splitSourceId });
   saveIndex(index);
   return id;
 }
@@ -130,6 +136,15 @@ export function setRosterConfiguration(id: string, configuration: RosterConfigur
   const entry = index.find((r) => r.id === id);
   if (entry) {
     entry.configuration = configuration;
+    saveIndex(index);
+  }
+}
+
+export function setSplitSourceId(id: string, sourceId: string): void {
+  const index = listRosters();
+  const entry = index.find((r) => r.id === id);
+  if (entry) {
+    entry.splitSourceId = sourceId;
     saveIndex(index);
   }
 }

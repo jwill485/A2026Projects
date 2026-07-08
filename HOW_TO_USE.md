@@ -102,7 +102,10 @@ viewing) and the **action buttons** (things you can do). The tabs are:
   Click **Hide Roster List** to go back to the tree.
 - **Drag & Drop** — the same structure, but editable: drag troopers between
   billets, add companies/platoons/squads, and add/edit/delete/import
-  troopers and whole companies.
+  troopers and whole companies. Laid out as three columns — **Pool** (every
+  unplaced trooper), **Structure** (the one company you're currently
+  building), **Detail** (click any unit's ⓘ to see its full breakdown) —
+  see [Using Drag & Drop](#using-drag--drop) below.
 - **Split Planner** — the guided home for splitting 2-7 into two new
   battalions, in four tracked phases — see
   [Splitting the battalion](#splitting-the-battalion-split-planner) below.
@@ -141,38 +144,49 @@ while a filter is active) instantly brings everything back.
 
 ## Using Drag & Drop
 
-The Drag & Drop tab shows Battalion HQ at the top, then two side-by-side
-panes ("Kanban" style). Use the two dropdowns to pick which company (or the
-Unassigned pool) each side shows:
+The Drag & Drop tab shows Battalion HQ at the top, then a three-column
+workbench:
 
-- **Other (left)** — whatever you want a second view of: an old company
-  you're breaking down, a comparison, or just anywhere else.
-- **Building (right — new troopers land here)** — this is the destination.
-  Anyone brought in via **+ Add Trooper** or **+ Import Trooper** lands here,
-  so point it at whichever company you're currently populating.
+- **Pool (left)** — every trooper not yet placed in a company, always
+  visible (no dropdown needed to see it). Filter by **tier** (Officers /
+  Senior NCOs / Junior NCOs / Troopers), **MOS**, **practice time** (if
+  they came from a squad that had one set), or search by name. Drag anyone
+  out of here into the Structure column, or drag someone back in to
+  unassign them.
+- **Structure (center)** — one company at a time, picked from the
+  **Building** dropdown. Every company/platoon/squad header shows a row of
+  small dots — **●** filled, **○** vacant — for that unit's leadership
+  billets, visible without expanding anything. Squad headers also show a
+  compact MOS tally.
+- **Detail (right)** — click the **ⓘ** next to any battalion, company,
+  platoon, or squad to load its full breakdown here: who fills each
+  billet, headcount, and MOS makeup.
 
-You can point both dropdowns at the same company if you just want one big
-pane instead of two.
-
-- **Click to assign (the easy way)**: every **VACANT** billet is clickable,
-  and each squad's member list ends with **+ assign trooper**. Clicking
-  opens a picker showing just the people that billet normally draws from
-  (officers for CO/XO/Platoon Leader, senior NCOs for SGM/1SG/PSG, junior
-  NCOs for Squad Leader, everyone for members), sorted by rank with pool
-  members first, each showing their MOS, where they currently sit, and
-  their squad's practice time. Search to narrow, tick **Show all ranks**
-  if you need someone outside the usual tier, and click **Assign** — done.
+- **Click to assign (the easy way)**: every **VACANT** billet — including
+  the leadership-strip dots themselves — is clickable, and each squad's
+  member list ends with **+ assign trooper**. Clicking opens a picker
+  showing just the people that billet normally draws from (officers for
+  CO/XO/Platoon Leader, senior NCOs for SGM/1SG/PSG, junior NCOs for Squad
+  Leader, everyone for members), sorted by rank with pool members first,
+  each showing their MOS, where they currently sit, and their squad's
+  practice time. Search to narrow, tick **Show all ranks** if you need
+  someone outside the usual tier, and click **Assign** — done. Since only
+  one company is on screen at a time, this is also how you move someone
+  from a *different* company: pick them from wherever they currently sit.
 - **Dragging a trooper**: still works everywhere — click and hold their
   name, drag to any billet (Commander, XO, 1SG, Platoon Leader/Sergeant,
-  Squad Leader, or a squad's member list) in either pane, and release.
-  Occupied billets are **blocked** — you can't drop onto a slot that
-  already has someone in it; move or remove the current occupant first.
+  Squad Leader, or a squad's member list), and release. Occupied billets
+  are **blocked** — you can't drop onto a slot that already has someone in
+  it; move or remove the current occupant first.
 - **Dragging a whole squad**: click and hold the **⠿ Squad N** handle in a
   squad's summary line (next to its Leader) and drop it on the dashed
-  **"Drop a squad here"** strip below any platoon's squad list — moves the
-  leader and every member together in one action. If that platoon already
-  has a squad with the same number, the incoming one is automatically
-  renumbered rather than colliding.
+  **"Drop a squad here"** strip below any platoon's squad list in the
+  *same* company — moves the leader and every member together in one
+  action. If that platoon already has a squad with the same number, the
+  incoming one is automatically renumbered rather than colliding. (Moving
+  a whole squad to a *different* company isn't supported yet — only
+  individual troopers can move cross-company right now, via click to
+  assign.)
 - **✎ (edit)** next to a trooper's name — opens a form to change their name,
   rank, or MOS without moving them.
   **✕ (delete)** — removes them from the roster entirely (with confirmation).
@@ -185,35 +199,41 @@ pane instead of two.
   the ✕ is disabled with a tooltip explaining why. Move everyone out first if
   you want to remove a populated one.
 - **+ Add Company** — type a short code (e.g. `D`) and a name (e.g. `Dog`),
-  then click Add Company. Codes must be unique within the roster.
+  then click Add Company. Codes must be unique within the roster; the new
+  company becomes the active one in Structure.
 - **+ Add Trooper** — opens a form (name, rank, MOS) and drops the new
-  trooper into whichever company the **Building** pane is currently pointed
-  at, ready to drag into place.
+  trooper into the Pool, ready to assign or drag into place.
 - **+ Import Trooper** — opens a searchable list of every real trooper
   currently in the live 2-7 + B/ACD roster (name, rank, current real-world
-  unit). Click **Add** next to anyone to copy them into the **Building** pane
-  with their real name/rank/MOS — useful for seeding a custom roster without
-  typing everyone in by hand. Already-imported troopers show **Added** and
-  can't be added twice.
+  unit). Click **Add** next to anyone to copy them into the Pool with their
+  real name/rank/MOS — useful for seeding a custom roster without typing
+  everyone in by hand. Already-imported troopers show **Added** and can't
+  be added twice.
 - **+ Import Company** — brings in an *entire* real company at once —
   Able, Baker, Charlie, Easy, or **Unassigned** — with its full
-  platoon/squad structure and leadership intact, instead of adding people one
-  at a time. Importing Unassigned merges its real structure into your
-  roster's own Unassigned pool (every roster already has one, so it doesn't
-  show up as a separate pane). If a trooper from that company already exists
-  elsewhere in your roster (e.g. you'd already imported them individually),
-  they're quietly skipped rather than duplicated. Already-imported companies
-  show **Imported** and can't be re-added.
+  platoon/squad structure and leadership intact, instead of adding people
+  one at a time, and switches Structure to show it. Importing Unassigned
+  merges its real structure into your roster's own Pool. If a trooper from
+  that company already exists elsewhere in your roster (e.g. you'd already
+  imported them individually), they're quietly skipped rather than
+  duplicated. Already-imported companies show **Imported** and can't be
+  re-added.
 
 Anyone brought in via either import button remembers where they came from —
 see the Change Log entry below.
 
+If you're viewing a freshly-committed HLLV or HLLWW2 roster, the toolbar
+also offers **💡 Suggest structure** — the same suggested-companies preview
+as the Split Planner's Unit Builder phase (see below), computed from the
+source roster's tags and practice times, applied directly to the roster
+you're already looking at.
+
 ## Unassigned pool
 
 Troopers from B/ACD (or anyone not yet placed in a company) live in a
-separate **Unassigned** group, organized the same way as a company
-(platoons/squads) rather than as a flat list. Select it from either pane
-dropdown in Drag & Drop to move people out of it.
+separate **Unassigned** group. On the Battalion Roster tab it's shown
+organized like a company (platoons/squads); on Drag & Drop, it's the
+always-visible **Pool** column described above.
 
 ## Analytics tab
 

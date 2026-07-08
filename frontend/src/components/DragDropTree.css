@@ -159,7 +159,7 @@ ul.drop-slot {
   background: #333;
 }
 
-.kanban-toolbar {
+.dnd-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -167,14 +167,25 @@ ul.drop-slot {
   margin: 0.8rem 0;
 }
 
-.kanban-selectors {
-  display: flex;
-  gap: 1.5rem;
+.dnd-toolbar label {
   padding: 0.5rem 0.7rem;
   background: #1a1a19;
   border-radius: 6px;
   color: #ccc;
   font-size: 0.9rem;
+}
+
+.dnd-toolbar select {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
+.dnd-toolbar select:focus-visible {
+  outline: 2px solid #ffc72c;
+  outline-offset: 1px;
 }
 
 .add-company-form {
@@ -201,35 +212,183 @@ ul.drop-slot {
   outline-offset: 1px;
 }
 
-.kanban-selectors select {
+/* --- Workbench layout: Pool | Structure | Detail ------------------------- */
+
+.dnd-workbench {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(360px, 1.6fr) minmax(220px, 0.85fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .dnd-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dnd-structure {
+  min-width: 0;
+}
+
+.pool-panel,
+.detail-panel {
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #17171a;
+  padding: 0.6rem 0.7rem;
+  position: sticky;
+  top: 0.5rem;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.pool-panel h3,
+.detail-panel h3 {
+  margin: 0 0 0.4rem 0;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.detail-panel h4 {
+  margin: 0.6rem 0 0.2rem 0;
+  color: #ccc;
+  font-size: 0.82rem;
+}
+
+.pool-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.pool-filters input,
+.pool-filters select {
   background: #222;
   color: #eee;
   border: 1px solid #444;
   border-radius: 4px;
-  padding: 0.2rem 0.4rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.82rem;
 }
 
-.kanban-selectors select:focus-visible {
-  outline: 2px solid #ffc72c;
-  outline-offset: 1px;
+.pool-list {
+  border-radius: 4px;
+  outline: 2px dashed transparent;
+  outline-offset: 2px;
 }
 
-.kanban-columns {
+.pool-list.drop-ok {
+  outline-color: #4caf50;
+}
+
+.pool-row {
   display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding: 0.3rem 0.2rem;
+  border-bottom: 1px solid #262626;
+  font-size: 0.84rem;
 }
 
-.kanban-column {
-  flex: 1 1 0;
-  min-width: 320px;
-  padding-right: 0.3rem;
+.pool-row:last-child {
+  border-bottom: none;
 }
 
-.kanban-column.unassigned-pool {
-  border: 1px dashed #d97757;
+.pool-meta {
+  color: #7ec8e3;
+  font-size: 0.72rem;
+  margin-left: 0.3rem;
+}
+
+.pool-empty {
+  color: #777;
+  font-style: italic;
+  font-size: 0.82rem;
+  padding: 0.4rem 0;
+}
+
+.detail-empty {
+  color: #777;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.detail-fill-list,
+.detail-mos-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.84rem;
+  color: #ccc;
+}
+
+.detail-fill-list li,
+.detail-mos-list li {
+  padding: 0.15rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.detail-fill-list li::before {
+  content: "○ ";
+  color: #8a5a4a;
+}
+
+.detail-fill-list li.stat-done::before {
+  content: "● ";
+  color: #8fce8f;
+}
+
+.detail-headcount {
+  color: #999;
+  font-size: 0.8rem;
+  margin: 0.4rem 0;
+}
+
+.mos-tally {
+  margin-left: 0.5rem;
+  color: #7ec8e3;
+  font-size: 0.74rem;
+}
+
+.detail-btn {
+  margin-left: 0.3rem;
+}
+
+/* --- Staged / "mark complete" companies ---------------------------------- */
+
+.stage-toggle-btn {
+  margin-left: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.stage-toggle-btn.staged {
+  border-color: #ffc72c;
+  color: #ffc72c;
+}
+
+.staged-badge {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid #ffc72c;
+  border-radius: 3px;
+  color: #ffc72c;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+
+.company-node.staged {
+  border: 1px dashed #ffc72c;
   border-radius: 6px;
-  padding: 0.6rem;
-  background: #241c1c;
+  opacity: 0.9;
+}
+
+.squad-drag-handle.locked {
+  cursor: not-allowed;
+  color: #777;
 }

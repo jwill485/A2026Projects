@@ -41,6 +41,11 @@ export interface Company {
   executiveOfficer: Soldier | null;
   firstSergeant: Soldier | null;
   platoons: Platoon[];
+  // Marked "complete" in the Drag & Drop workbench: moves it to the Staged
+  // section of the company picker and locks it against structural changes
+  // (incoming drops/assigns, added/deleted platoons or squads) until
+  // un-staged. Still fully viewable. Never set on roster.unassigned.
+  staged?: boolean;
 }
 
 export interface Battalion {

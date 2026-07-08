@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { RosterData, Soldier } from "../types/roster";
 import type { ApiRankExpanded } from "../types/api";
 import type { SlotPath } from "../lib/moveSoldier";
-import { collectAllSoldiers, collectCompanySoldiers } from "../lib/analytics";
+import { collectAllSoldiers, collectCompanySoldiers, practiceTimeByUser } from "../lib/analytics";
 import { describeSoldierLocations } from "../lib/changelog";
 import { classifyTier, TIER_LABELS, type LeadershipTier } from "../lib/leadership";
 import "./SoldierForm.css";
@@ -27,6 +27,7 @@ const SLOT_TIERS: Record<SlotPath["kind"], LeadershipTier[] | null> = {
   platoonSergeant: ["seniorNco"],
   squadLeader: ["juniorNco"],
   squadMember: null,
+  unassignedPool: null,
 };
 
 export function describeSlot(destination: SlotPath): string {
@@ -51,22 +52,9 @@ export function describeSlot(destination: SlotPath): string {
       return `${destination.company} / Plt ${destination.platoon} / Sqd ${destination.squad} — Squad Leader`;
     case "squadMember":
       return `${destination.company} / Plt ${destination.platoon} / Sqd ${destination.squad} — Member`;
+    case "unassignedPool":
+      return "Unassigned pool";
   }
-}
-
-function practiceTimeByUser(roster: RosterData): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const company of [...roster.battalion.companies, roster.unassigned]) {
-    for (const platoon of company.platoons) {
-      for (const squad of platoon.squads) {
-        const time = (squad.practiceTime ?? "").trim();
-        if (time === "") continue;
-        if (squad.leader) map.set(squad.leader.userId, time);
-        for (const member of squad.members) map.set(member.userId, time);
-      }
-    }
-  }
-  return map;
 }
 
 export function CandidatePicker({

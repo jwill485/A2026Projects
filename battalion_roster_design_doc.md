@@ -48,29 +48,56 @@ Unassigned pool. Vacant billets show a **VACANT** label; each level shows a
 headcount badge.
 
 ### 2.3 Drag-and-Drop Assignment
-The **Drag & Drop** tab shows the same tree as two side-by-side, independently
-selectable panes ("Kanban" style):
-- **Other (left)** — any company, or Unassigned.
-- **Building (right)** — same options; this is also where newly
-  added/imported troopers land, so point it at whatever you're currently
-  populating. (You can point both panes at the same company if you just want
-  one big single-pane view.)
 
-Dragging a trooper onto an occupied billet is **blocked** (no swap/bump) —
-move or remove the current occupant first. Troopers show small ✎ (edit) and
-✕ (delete) affordances alongside their name.
+The **Drag & Drop** tab (`DragDropTree.tsx`) is a workbench: **Pool | Structure
+| Detail**, three columns instead of the two arbitrary side-by-side company
+panes it used to be. The redesign's goal was to make the parameters that
+matter when constructing units — leadership fill, MOS makeup, practice time —
+visible at a glance instead of requiring a trip to Analytics or the Split
+Planner, while leaving the drag-and-drop mechanic itself untouched.
+
+- **Pool (left)** — every trooper in the Unassigned company, always visible
+  (no need to point a pane at it), filterable by **tier** (Officer/Senior
+  NCO/Junior NCO/Trooper, via `classifyTier`), **MOS**, **practice time**
+  (inherited from whichever squad they were last in, via
+  `practiceTimeByUser`), and name/username search. It's a drop target too —
+  dragging someone here (a new `{ kind: "unassignedPool" }` `SlotPath`,
+  handled in `moveSoldier.ts` the same way `addSoldierToCompany`'s holding
+  squad works) sends them back to the pool from wherever they were.
+- **Structure (center)** — one active company at a time, picked from a
+  **Building** dropdown (replacing the old Left/Right pane selectors).
+  Every company/platoon/squad header carries a **leadership strip**
+  (`LeadershipStrip.tsx`) — a row of filled/vacant dots (`●`/`○`) for that
+  unit's billets, always visible whether or not the tree node is expanded.
+  Vacant dots are clickable shortcuts straight into the candidate picker
+  (same as a slot's own vacant button); squad headers also show a compact
+  MOS tally (`computeSquadMos`).
+- **Detail (right)** — click the **ⓘ** next to any battalion/company/
+  platoon/squad header to load its full detail here: fill status per
+  billet, headcount, and MOS breakdown (`computeMosBreakdown`, the shared
+  helper both this panel and the build-suggestion engine use). Keeps the
+  center tree from needing to show everything inline.
+
+Dragging a trooper onto an occupied billet is still **blocked** (no
+swap/bump) — move or remove the current occupant first. Troopers show small
+✎ (edit) and ✕ (delete) affordances alongside their name. **+ Add Trooper**
+and **+ Import Trooper** both land in the Pool now (previously Import landed
+in whichever pane was "Building" — this was the consistency gap noted in
+§8.3, now resolved by having a single obvious landing spot).
 
 **Click-to-assign** is the low-friction alternative to dragging
-(`CandidatePicker.tsx`): every vacant billet is a clickable button, and each
-squad's member list ends with a **+ assign trooper** affordance. Clicking
-opens a modal picker listing candidates filtered to the leadership tier the
-billet draws from (officers for CO/XO/PL, senior NCOs for SGM/1SG/PSG,
-junior NCOs for Squad Leader, everyone for members — same `leadership.ts`
-tiers as the Split Planner), rank-sorted with pool members first, each row
+(`CandidatePicker.tsx`): every vacant billet is a clickable button (or a
+vacant leadership-strip dot), and each squad's member list ends with a
+**+ assign trooper** affordance. Clicking opens a modal picker listing
+candidates filtered to the leadership tier the billet draws from (officers
+for CO/XO/PL, senior NCOs for SGM/1SG/PSG, junior NCOs for Squad Leader,
+everyone for members), rank-sorted with pool members first, each row
 showing MOS, current location, and squad practice time, with a search box
 and a **Show all ranks** escape hatch. One click places the person through
-the same `moveSoldier` path as a drag. Dragging still works everywhere —
-the button sits inside the droppable.
+the same `moveSoldier` path as a drag. Since only one company is visible at
+a time, this is also how a trooper moves **between two different
+companies** — pick them from wherever they currently sit rather than
+needing both companies' panes open simultaneously.
 
 A squad can also be dragged as a whole unit via its **⠿ Squad N** handle in
 the summary line, dropped onto any platoon's **squad-list drop zone** (a
@@ -78,11 +105,25 @@ persistent "Drop a squad here" strip below that platoon's squads, since the
 gaps between existing squad cards are too thin to reliably target). Moves
 the leader and every member together; if the destination platoon already
 has a squad using that number, the incoming one is auto-renumbered (same
-next-available scheme as **+ Add Squad**) rather than colliding.
+next-available scheme as **+ Add Squad**) rather than colliding. **Known
+trade-off of the single-active-company layout:** whole-squad drag only
+reaches platoons within the *same* company, since a second company's squad
+list isn't rendered simultaneously — moving a whole squad to a *different*
+company isn't yet supported by any affordance (click-to-assign only moves
+one person at a time). Flagged as a fast-follow in §8.3.
+
+When viewing a split-output roster (HLLV/HLLWW2) whose source roster is
+resolvable (see `RosterSummary.splitSourceId` in §3), the toolbar also shows
+a **💡 Suggest structure** preview (`SuggestionPreview.tsx`, shared with the
+Split Planner's Unit Builder phase — see §2.9 phase 5) computed from the
+source roster's tags and practice times. Applying it writes the suggested
+companies directly into the roster already open — simpler than the Split
+Planner's version, which has to save into a roster that isn't the one
+currently active.
 
 ### 2.4 Trooper Management
 Add, edit, and delete troopers directly (name, rank — selected from the
-7Cav rank list, MOS). New troopers land in the **Building** pane. Editing
+7Cav rank list, MOS). New troopers land in the Pool (§2.3). Editing
 changes name/rank/MOS in place without moving the trooper; rank changes
 re-sort them within their squad.
 
@@ -101,14 +142,14 @@ the live 7Cav API:
 - **Refresh from API** — rebuilds the *active* roster from the live 2-7 data
   (destructive to that one roster; confirmed first).
 - **+ Import Trooper** — a searchable picker of every real trooper currently
-  in 2-7 + B/ACD; adds one at a time into the Building pane.
+  in 2-7 + B/ACD; adds one at a time into the Pool.
 - **+ Import Company** — pulls a whole company (Able/Baker/Charlie/Easy, or
   the B/ACD/Unassigned group) into the active roster in one action, platoons
-  and leadership intact. Importing the B/ACD group merges into the
-  destination roster's own Unassigned pool (every roster already has one) —
-  it never creates a second Unassigned pane. Troopers already present
-  elsewhere in the destination roster are silently skipped rather than
-  duplicated.
+  and leadership intact, and switches Structure to show it. Importing the
+  B/ACD group merges into the destination roster's own Unassigned pool
+  (every roster already has one) — it never creates a second Pool. Troopers
+  already present elsewhere in the destination roster are silently skipped
+  rather than duplicated.
 
 Every imported trooper remembers their original billet at import time (see
 §2.7) — this is separate from, and doesn't overwrite, wherever they get
@@ -373,9 +414,16 @@ interface RosterSummary {
   id: string;
   name: string;
   updatedAt: string;
-  configuration?: "old" | "new";
+  configuration?: "old" | "new"; // optional, user-set via rename — NOT reliable for finding "the source roster"
+  splitSourceId?: string;        // for HLLV/HLLWW2: which roster was active when Commit Split created it
 }
 ```
+`splitSourceId` exists specifically because `configuration` is a manual label
+(set only if the user picks it in the rename dialog) — Drag & Drop's
+"Suggest structure" (§2.3) needs a *deterministic* way to find the tagged
+source roster for a split-output roster, so `handleCommitSplit` records the
+active roster's id onto HLLV/HLLWW2 at commit time rather than guessing from
+tags that might not be set.
 
 ### 3.1 Storage
 All client-side, in `localStorage`, namespaced per roster id:
@@ -404,11 +452,12 @@ Below that, whichever tab is active (Battalion Roster and Drag & Drop also
 get the shared filter bar, §2.12):
 - **Battalion Roster** — optional Old/New badge, then the read-only tree +
   Unassigned pool.
-- **Drag & Drop** — Battalion HQ, the Other/Building pane selectors, the
+- **Drag & Drop** — Battalion HQ, the Building company switcher, the
   Add Company / Add Trooper / Import Trooper / Import Company buttons, then
-  the two Kanban panes side by side.
-- **Split Planner** — the four guided split phases (§2.9): sort progress,
-  leadership review, Commit Split, per-battalion build tracking.
+  the Pool / Structure / Detail workbench (§2.3).
+- **Split Planner** — the five guided split phases (§2.9): sort progress,
+  practice times, leadership review, Commit Split, per-battalion build
+  tracking.
 - **Analytics** — the "Show as tables" toggle, then the four charts/reports.
 
 The whole app uses a fixed dark theme (`#000` background) with a gold/blue
@@ -425,12 +474,13 @@ color scheme with no light-mode variant.
 **Reorganize the real (live) roster:** Drag & Drop tab, move people around,
 Save Changes to log it (or Revert to back out first).
 
-**Add a trooper:** + Add Trooper → name/rank/MOS → lands in the Building pane
-→ drag into place.
+**Add a trooper:** + Add Trooper → name/rank/MOS → lands in the Pool → drag
+or click-to-assign into place.
 
 **Pull in real people:** + Import Trooper (one at a time, searchable) or
-+ Import Company (a whole company, or B/ACD, at once) → both land in the
-Building pane.
++ Import Company (a whole company, or B/ACD, at once) → Import Trooper lands
+in the Pool; Import Company switches Structure to the newly-imported
+company.
 
 **Build a custom/alternate roster:** + New Roster (Blank) → + Add Company to
 lay out structure → Import Trooper/Company to populate → drag into place.
@@ -486,14 +536,35 @@ Save Changes / Revert Changes operate on a separate baseline snapshot
 - **dnd-kit ids must be unique per rendered instance, not per entity:**
   every `useDraggable`/`useDroppable` id is a React `useId()`, not the
   trooper's `userId` or a `JSON.stringify`'d destination. The real target
-  travels via each hook's `data` field instead. This matters because the
-  same person/billet can be on screen twice at once — both Drag & Drop
-  panes pointed at the same company (§2.3, a documented supported case) or
-  a freshly-committed split roster where both panes default to the same
-  empty-battalion Unassigned pool (§2.9 phase 3) — and dnd-kit silently
-  drops the drag (resolves `over` to nothing) when two elements share an id
-  rather than erroring, so this class of bug produces no console error, just
-  a drag that mysteriously does nothing.
+  travels via each hook's `data` field instead. This mattered concretely
+  under the old dual-pane Drag & Drop layout (§2.3, pre-rework), where the
+  same person/billet could render twice at once (both panes pointed at the
+  same company, or a freshly-committed split roster defaulting both panes
+  to the same empty pool) — dnd-kit silently drops the drag (resolves
+  `over` to nothing) when two elements share an id rather than erroring, so
+  this class of bug produces no console error, just a drag that
+  mysteriously does nothing. The single-active-company + persistent-Pool
+  layout no longer creates this duplication naturally, but the underlying
+  rule still applies to anything rendered more than once.
+- **`npx tsc --noEmit` alone silently checks nothing here:** the root
+  `tsconfig.json` is a solution file (`files: []` plus `references` to
+  `tsconfig.app.json`/`tsconfig.node.json`) — a plain `tsc --noEmit`
+  invocation from `frontend/` finds nothing to check under that config and
+  exits 0 even with real type errors present (confirmed by deliberately
+  injecting `const x: number = 'a string'` — it did not get caught). Use
+  **`npx tsc -b --force`** (matches `package.json`'s own `build` script,
+  `tsc -b && vite build`) or `npx tsc -p tsconfig.app.json --noEmit`
+  instead. This had been silently producing false "clean" results for a
+  while before being caught mid-way through the Drag & Drop rework, which
+  is also when the two real bugs below were found.
+- **Generic constraints on a wrapper array type, not its elements:** a
+  helper that only ever calls `.length`/spreads on `T[]` (the array) should
+  be `function f<T>(clusters: T[][])`, not
+  `function f<T extends { length: number }>(...)` — the latter incorrectly
+  requires each *element* to have a `.length` property. `buildSuggestions.ts`'s
+  `packClustersIntoBins` had exactly this mistake; because JS doesn't
+  enforce generic constraints at runtime, it never broke anything visibly
+  and was only caught once the `tsc` invocation above was fixed.
 
 ### 6.4 External Data Source: 7Cav MILPACS API
 
@@ -556,8 +627,8 @@ a real design question if this needs to be shared across multiple leaders.
 - **Computed, not eyeballed, contrast:** the color scheme was chosen and
   verified via WCAG relative-luminance contrast ratios, not by eye.
 - **Read-only vs. editable views kept separate:** Battalion Roster (tree,
-  read-only) and Drag & Drop (Kanban, editable) are different tabs rather
-  than one view with an edit-mode toggle.
+  read-only) and Drag & Drop (Pool/Structure/Detail workbench, editable) are
+  different tabs rather than one view with an edit-mode toggle.
 
 ---
 
@@ -591,16 +662,25 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 
 ### 8.3 Other Not-Yet-Built Ideas
 
-- **Unit Builder redesign — remaining ideas:** the first round is built
-  (click-to-assign with tier-filtered candidate pickers §2.3, structure- and
-  leadership-aware build suggestions §2.9 phase 5, the C→HLLV intact
-  transfer). Still open if wanted: a dedicated step-by-step build surface
-  that walks battalion HQ → company leadership → platoon leadership →
-  squads as explicit stages rather than one open tree; generalizing the
-  intact transfer to any company → either battalion; and smarter
-  suggestion heuristics (MOS balancing *within* a company's platoons, e.g.
-  spreading medics evenly, on top of the current practice-time clustering
-  and leadership-capacity sizing).
+- **Drag & Drop / Unit Builder — remaining ideas:** the Pool/Structure/Detail
+  workbench rework is built (§2.3), on top of the earlier click-to-assign
+  and structure/leadership-aware build suggestions (§2.9 phase 5) and the
+  C→HLLV intact transfer. Still open if wanted:
+  - **Whole-squad drag between two different companies** — currently only
+    works within the active company's own platoons, since a second
+    company's squad list isn't rendered at the same time (§2.3's "known
+    trade-off"). Would need either a lightweight "move squad to company"
+    picker (mirroring `CandidatePicker` but for a whole squad) or a way to
+    temporarily bring a second company's structure on screen.
+  - Generalizing the intact transfer (§2.9) to any company → either
+    battalion, not just C→HLLV.
+  - Smarter suggestion heuristics — MOS balancing *within* a company's
+    platoons (e.g. spreading medics evenly), on top of the current
+    practice-time clustering and squad-count-driven sizing.
+  - A dedicated step-by-step build surface (battalion HQ → company
+    leadership → platoon leadership → squads as explicit stages) if the
+    current single-company-tree-plus-strips view still feels like too much
+    at once once it's been used for a while.
 - **Personnel query tab:** a separate tab for querying MILPACS profile data
   about troopers in 2-7 and B/ACD — graduations, disciplinary records,
   awards, secondary billets, ranks, and MOS. The full (non-lite) roster
@@ -613,10 +693,6 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 - **Notes/flags:** per-trooper notes (medical, discipline, promotion review).
 - **Multi-user auth:** role-based access if this ever needs to be shared
   rather than run locally by one person (see §6.5).
-- **Consistency question:** **+ Add Trooper** still always lands in
-  Unassigned, while **+ Import Trooper** lands in the Building pane (per
-  §2.3/§2.6) — worth revisiting whether Add Trooper should match Import
-  Trooper's targeting for consistency.
 
 ---
 

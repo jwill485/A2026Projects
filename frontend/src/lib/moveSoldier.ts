@@ -12,7 +12,11 @@ export type SlotPath =
   | { kind: "platoonLeader"; company: string; platoon: string }
   | { kind: "platoonSergeant"; company: string; platoon: string }
   | { kind: "squadLeader"; company: string; platoon: string; squad: string }
-  | { kind: "squadMember"; company: string; platoon: string; squad: string };
+  | { kind: "squadMember"; company: string; platoon: string; squad: string }
+  // Drop target for the Drag & Drop Pool panel: puts someone back in the
+  // Unassigned pool's holding squad, same convention as addSoldierToCompany.
+  // Never "occupied" — it's a bucket, not a single billet.
+  | { kind: "unassignedPool" };
 
 function allCompanies(roster: RosterData): Company[] {
   return [...roster.battalion.companies, roster.unassigned];
@@ -28,6 +32,13 @@ function findPlatoon(company: Company, number: string): Platoon | undefined {
 
 function findSquad(platoon: Platoon, number: string) {
   return platoon.squads.find((s) => s.number === number);
+}
+
+// A destination naming a company (everything except battalion billets and
+// the pool) is blocked once that company is staged/marked complete.
+function isDestinationLocked(roster: RosterData, destination: SlotPath): boolean {
+  if (!("company" in destination)) return false;
+  return findCompany(roster, destination.company)?.staged === true;
 }
 
 export function isSlotOccupied(roster: RosterData, destination: SlotPath): boolean {
@@ -61,6 +72,8 @@ export function isSlotOccupied(roster: RosterData, destination: SlotPath): boole
       return squad?.leader != null;
     }
     case "squadMember":
+      return false;
+    case "unassignedPool":
       return false;
   }
 }
@@ -189,6 +202,21 @@ function placeSoldier(roster: RosterData, soldier: Soldier, destination: SlotPat
       squad.members.push(soldier);
       return true;
     }
+    case "unassignedPool": {
+      // Same holding platoon/squad convention as addSoldierToCompany.
+      let platoon = roster.unassigned.platoons.find((p) => p.number === "0");
+      if (!platoon) {
+        platoon = { number: "0", leader: null, sergeant: null, squads: [] };
+        roster.unassigned.platoons.unshift(platoon);
+      }
+      let squad = platoon.squads.find((s) => s.number === "0");
+      if (!squad) {
+        squad = { number: "0", leader: null, members: [] };
+        platoon.squads.unshift(squad);
+      }
+      squad.members.push(soldier);
+      return true;
+    }
   }
 }
 
@@ -197,7 +225,7 @@ export function moveSoldier(
   userId: string,
   destination: SlotPath,
 ): { roster: RosterData; ok: boolean } {
-  if (isSlotOccupied(roster, destination)) {
+  if (isSlotOccupied(roster, destination) || isDestinationLocked(roster, destination)) {
     return { roster, ok: false };
   }
   const clone = structuredClone(roster);
@@ -211,7 +239,7 @@ export function moveSoldier(
 export function addPlatoon(roster: RosterData, companyLetter: string): RosterData {
   const clone = structuredClone(roster);
   const company = findCompany(clone, companyLetter);
-  if (!company) return roster;
+  if (!company || company.staged) return roster;
   const nextNumber = String(
     company.platoons.reduce((max, p) => Math.max(max, Number(p.number)), 0) + 1,
   );
@@ -223,7 +251,7 @@ export function addSquad(roster: RosterData, companyLetter: string, platoonNumbe
   const clone = structuredClone(roster);
   const company = findCompany(clone, companyLetter);
   const platoon = company && findPlatoon(company, platoonNumber);
-  if (!platoon) return roster;
+  if (!platoon || company.staged) return roster;
   const nextNumber = String(
     platoon.squads.reduce((max, s) => Math.max(max, Number(s.number)), 0) + 1,
   );
@@ -244,7 +272,7 @@ export function deleteSquad(
   const company = findCompany(roster, companyLetter);
   const platoon = company && findPlatoon(company, platoonNumber);
   const squad = platoon && findSquad(platoon, squadNumber);
-  if (!squad || !isSquadEmpty(squad)) return { roster, ok: false };
+  if (!squad || !isSquadEmpty(squad) || company?.staged) return { roster, ok: false };
   const clone = structuredClone(roster);
   const cloneCompany = findCompany(clone, companyLetter)!;
   const clonePlatoon = findPlatoon(cloneCompany, platoonNumber)!;
@@ -259,7 +287,7 @@ export function deletePlatoon(
 ): { roster: RosterData; ok: boolean } {
   const company = findCompany(roster, companyLetter);
   const platoon = company && findPlatoon(company, platoonNumber);
-  if (!platoon || !isPlatoonEmpty(platoon)) return { roster, ok: false };
+  if (!platoon || !isPlatoonEmpty(platoon) || company?.staged) return { roster, ok: false };
   const clone = structuredClone(roster);
   const cloneCompany = findCompany(clone, companyLetter)!;
   cloneCompany.platoons = cloneCompany.platoons.filter((p) => p.number !== platoonNumber);
@@ -287,7 +315,7 @@ export function moveSquad(
   const squad = srcPlatoon && findSquad(srcPlatoon, source.squad);
   const destCompany = findCompany(roster, destination.company);
   const destPlatoon = destCompany && findPlatoon(destCompany, destination.platoon);
-  if (!squad || !destPlatoon) return { roster, ok: false };
+  if (!squad || !destPlatoon || srcCompany?.staged || destCompany?.staged) return { roster, ok: false };
 
   const clone = structuredClone(roster);
   const cSrcPlatoon = findPlatoon(findCompany(clone, source.company)!, source.platoon)!;
@@ -353,6 +381,17 @@ export function addCompany(
   const clone = structuredClone(roster);
   clone.battalion.companies.push(makeCompany(letter, name));
   return { roster: clone, ok: true };
+}
+
+// Marks a company "complete" (or un-marks it) — see Company.staged. Only
+// meaningful for real companies, not the Unassigned pool.
+export function setCompanyStaged(roster: RosterData, letter: string, staged: boolean): RosterData {
+  const clone = structuredClone(roster);
+  const company = clone.battalion.companies.find((c) => c.letter === letter);
+  if (!company) return roster;
+  if (staged) company.staged = true;
+  else delete company.staged;
+  return clone;
 }
 
 function pruneDuplicates(company: Company, existingIds: Set<string>): void {

@@ -2,7 +2,7 @@ import type { Platoon, RosterData, Soldier, SplitStatus, Squad } from "../types/
 import { makeCompany } from "./rosterFactory";
 import { removeSoldier } from "./moveSoldier";
 import { classifyTier } from "./leadership";
-import type { CountStat } from "./analytics";
+import { computeMosBreakdown, type CountStat } from "./analytics";
 
 // Suggests a company/platoon/squad structure for one side of the split from
 // what the source roster already knows: old squads stay intact as units,
@@ -62,26 +62,12 @@ const COMPANY_NAMES: Record<string, string> = {
   E: "Easy", F: "Fox", G: "George", H: "How",
 };
 
-function mosCounts(people: Soldier[]): CountStat[] {
-  const counts = new Map<string, number>();
-  for (const person of people) {
-    const mos = person.mos.trim() === "" ? "No MOS" : person.mos;
-    counts.set(mos, (counts.get(mos) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([label, value]) => ({ label, value }));
-}
-
 // Greedily assigns whole practice-time clusters (largest first) to whichever
 // bin currently has the fewest squads, so clusters stay together (squads
 // that train together stay in one company/platoon) while bin sizes stay
 // roughly balanced. A cluster bigger than the target average still lands
 // whole in one bin rather than being split.
-function packClustersIntoBins<T extends { length: number }>(
-  clusters: T[][],
-  binCount: number,
-): T[][] {
+function packClustersIntoBins<T>(clusters: T[][], binCount: number): T[][] {
   const bins: T[][] = Array.from({ length: binCount }, () => []);
   const sizes = new Array(binCount).fill(0);
   for (const cluster of clusters) {
@@ -118,7 +104,7 @@ export function suggestCompanies(
           practiceTime: (squad.practiceTime ?? "").trim() || undefined,
           leader,
           members: tagged.filter((s) => s.userId !== leader?.userId),
-          mos: mosCounts(tagged),
+          mos: computeMosBreakdown(tagged),
         });
       }
     }

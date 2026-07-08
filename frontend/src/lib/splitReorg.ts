@@ -56,6 +56,18 @@ export function buildSplitRoster(
           platoon.number = String(nextNumber + i);
         });
         copy.platoons.push(...foldedIn);
+        // B/ACD's own company-level staff (filled in via Import Company —
+        // see importCompany in moveSoldier.ts) ride along too, same
+        // don't-clobber-Charlie's-own priority as that merge.
+        if (!copy.commander && source.unassigned.commander) {
+          copy.commander = structuredClone(source.unassigned.commander);
+        }
+        if (!copy.executiveOfficer && source.unassigned.executiveOfficer) {
+          copy.executiveOfficer = structuredClone(source.unassigned.executiveOfficer);
+        }
+        if (!copy.firstSergeant && source.unassigned.firstSergeant) {
+          copy.firstSergeant = structuredClone(source.unassigned.firstSergeant);
+        }
       }
       for (const soldier of collectCompanySoldiers(copy)) delete soldier.splitStatus;
       carriedCompanies.push(copy);

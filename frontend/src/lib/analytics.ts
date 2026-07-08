@@ -43,18 +43,41 @@ export function collectAllSoldiers(roster: RosterData): Soldier[] {
   return soldiers;
 }
 
-// MOS makeup of one squad (leader + members), most common first — shown per
-// squad on the Split Planner's practice-times phase.
-export function computeSquadMos(squad: Squad): CountStat[] {
+// MOS makeup of any group of people, most common first. Shared by the Split
+// Planner's practice-times phase, the Drag & Drop unit-detail panel, and the
+// build-suggestion engine.
+export function computeMosBreakdown(people: Soldier[]): CountStat[] {
   const counts = new Map<string, number>();
-  const everyone = [...(squad.leader ? [squad.leader] : []), ...squad.members];
-  for (const soldier of everyone) {
+  for (const soldier of people) {
     const mos = soldier.mos.trim() === "" ? "No MOS" : soldier.mos;
     counts.set(mos, (counts.get(mos) ?? 0) + 1);
   }
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([label, value]) => ({ label, value }));
+}
+
+// MOS makeup of one squad (leader + members).
+export function computeSquadMos(squad: Squad): CountStat[] {
+  return computeMosBreakdown([...(squad.leader ? [squad.leader] : []), ...squad.members]);
+}
+
+// Every trooper's practice time, inherited from whichever squad they're
+// currently in (unset if their squad has none, or they're in the pool).
+// Shared by the click-to-assign candidate picker and the Drag & Drop pool.
+export function practiceTimeByUser(roster: RosterData): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const company of [...roster.battalion.companies, roster.unassigned]) {
+    for (const platoon of company.platoons) {
+      for (const squad of platoon.squads) {
+        const time = (squad.practiceTime ?? "").trim();
+        if (time === "") continue;
+        if (squad.leader) map.set(squad.leader.userId, time);
+        for (const member of squad.members) map.set(member.userId, time);
+      }
+    }
+  }
+  return map;
 }
 
 export function computeLeadershipFillByCompany(roster: RosterData): FillStat[] {

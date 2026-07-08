@@ -31,6 +31,7 @@ import {
   createRoster,
   renameRoster,
   setRosterConfiguration,
+  setSplitSourceId,
   deleteRoster,
   migrateLegacyStorage,
   type ChangeLogEntry,
@@ -46,7 +47,7 @@ import { OrgChart } from "./components/OrgChart";
 import { RosterListView } from "./components/RosterListView";
 import { RosterFilterBar } from "./components/RosterFilterBar";
 import { EMPTY_FILTER, type RosterFilter } from "./lib/filterRoster";
-import { buildSplitRoster, SPLIT_GROUPS } from "./lib/splitReorg";
+import { buildSplitRoster, INTACT_TRANSFER, SPLIT_GROUPS } from "./lib/splitReorg";
 import { applySplitTags, type SplitTagImportResult, type SplitTagRow } from "./lib/splitTagImport";
 import { fillDefaultPracticeTimes } from "./lib/practiceDefaults";
 import { SplitPlanner } from "./components/SplitPlanner";
@@ -274,7 +275,11 @@ function App() {
   }
 
   // Test helper for playing with the split's later phases without sorting
-  // for real: coin-flips every trooper onto HLLV or HLLWW2.
+  // for real: coin-flips every trooper onto HLLV or HLLWW2. When the intact
+  // transfer is checked, Charlie + B/ACD are already force-tagged HLLV (see
+  // handleSetCharlieToHllv) and go over as one unit regardless of tag, so
+  // randomizing them here would just fight that and get overwritten anyway —
+  // skip them and only randomize everyone else.
   function handleRandomizeSplitTags() {
     if (!roster) return;
     if (
@@ -285,7 +290,14 @@ function App() {
       return;
     }
     const clone = structuredClone(roster);
+    const skipIds = new Set<string>();
+    if (clone.sendCharlieToHllv) {
+      const charlie = clone.battalion.companies.find((c) => c.letter === INTACT_TRANSFER.letter);
+      if (charlie) for (const soldier of collectCompanySoldiers(charlie)) skipIds.add(soldier.userId);
+      for (const soldier of collectCompanySoldiers(clone.unassigned)) skipIds.add(soldier.userId);
+    }
     for (const soldier of collectAllSoldiers(clone)) {
+      if (skipIds.has(soldier.userId)) continue;
       soldier.splitStatus = Math.random() < 0.5 ? "hllv" : "hllww2";
     }
     clone.leadershipAccepted = false;
@@ -293,7 +305,7 @@ function App() {
   }
 
   function handleCommitSplit() {
-    if (!roster) return;
+    if (!roster || !rosterId) return;
     if (
       !window.confirm(
         "Commit the split? Everyone tagged HLLV or HLLWW2 lands in that battalion's Unassigned pool " +
@@ -310,9 +322,10 @@ function App() {
         saveRoster(existing.id, built);
         saveBaseline(existing.id, built);
         setRosterConfiguration(existing.id, "new");
+        setSplitSourceId(existing.id, rosterId);
         touchRoster(existing.id);
       } else {
-        createRoster(name, built, built, "new");
+        createRoster(name, built, built, "new", rosterId);
       }
     }
     setRosterList(listRosters());
@@ -433,8 +446,19 @@ function App() {
     .filter((mos) => mos.trim() !== "")
     .sort();
 
+  // Drag & Drop's "Suggest structure" action needs the SOURCE roster's tags
+  // + practice times — resolvable via splitSourceId, recorded on this roster
+  // at Commit Split time (not the optional, user-set "old"/"new" tag).
+  const currentSummary = rosterList.find((r) => r.id === rosterId);
+  const suggestionStatus =
+    activeConfiguration === "new"
+      ? (SPLIT_GROUPS.find((g) => g.name === currentSummary?.name)?.status ?? null)
+      : null;
+  const sourceRosterForSuggestions =
+    suggestionStatus && currentSummary?.splitSourceId ? loadRoster(currentSummary.splitSourceId) : null;
+
   return (
-    <section id="center" style={{ alignItems: "stretch", maxWidth: "900px" }}>
+    <section id="center" style={{ alignItems: "stretch", maxWidth: tab === "dragdrop" ? "1400px" : "900px" }}>
       <h1>2-7 Cavalry Battalion Roster</h1>
       <nav className="tab-bar">
         <RosterPicker
@@ -554,7 +578,8 @@ function App() {
           onImportCompany={handleImportCompany}
           onSetSplitStatus={splitStatusHandler}
           filter={rosterFilter}
-          unassignedHint={poolHint}
+          sourceRosterForSuggestions={sourceRosterForSuggestions}
+          suggestionStatus={suggestionStatus}
         />
       )}
       {tab === "split" && (
