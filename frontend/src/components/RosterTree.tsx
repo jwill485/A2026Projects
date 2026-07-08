@@ -173,8 +173,8 @@ export function UnassignedPool({
   group,
   filter = EMPTY_FILTER,
   onSetSplitStatus,
-  title = "B/ACD",
-  hint = "From B/ACD — pending manual reassignment into Charlie Company. Structure shown as currently organized within B/ACD.",
+  title = "Unassigned",
+  hint = "Pending manual reassignment into Charlie Company. Structure shown as currently organized.",
 }: {
   group: Company;
   filter?: RosterFilter;

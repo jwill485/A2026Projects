@@ -1,17 +1,20 @@
 import type { Platoon, RosterData, Soldier, SplitStatus, Squad } from "../types/roster";
 import { makeCompany } from "./rosterFactory";
 import { removeSoldier } from "./moveSoldier";
+import { classifyTier } from "./leadership";
 import type { CountStat } from "./analytics";
 
 // Suggests a company/platoon/squad structure for one side of the split from
 // what the source roster already knows: old squads stay intact as units,
-// units are clustered by practice time (squads that train together end up in
-// the same company), and each unit's MOS makeup is surfaced so specialty
-// spread is visible before applying. Leadership billets are deliberately
-// left vacant — filling them is a judgment call (see click-to-assign).
+// grouped by practice time (squads that train together end up in the same
+// company where the company-count cap allows it), sized to each
+// battalion's structural standards, and checked against how much
+// leadership is actually available. Leadership billets are deliberately
+// left vacant in the suggestion itself — filling them is a judgment call
+// (see click-to-assign).
 
 export interface SuggestedSquad {
-  // Where the unit came from, e.g. "A/1/2" or "B/ACD/1/5".
+  // Where the unit came from, e.g. "A/1/2" or "Unassigned/1/5".
   sourceLabel: string;
   practiceTime?: string;
   leader: Soldier | null;
@@ -27,17 +30,37 @@ export interface SuggestedPlatoon {
 export interface SuggestedCompany {
   letter: string;
   name: string;
-  practiceTime: string;
+  // Unique practice times represented in this company, sorted — a company
+  // can end up with more than one once bin-packed under a company-count cap.
+  practiceTimes: string[];
   platoons: SuggestedPlatoon[];
   headcount: number;
 }
+
+export interface SuggestionResult {
+  companies: SuggestedCompany[];
+  warnings: string[];
+}
+
+// Each battalion's structural standards (§8.3 discussion): HLLV is the
+// priority battalion and gets the larger allowed footprint; HLLWW2 is
+// deliberately smaller. Both share the same minimums per unit.
+export interface StructureRules {
+  minSquadsPerPlatoon: number;
+  minPlatoonsPerCompany: number;
+  minCompanies: number;
+  maxCompanies: number;
+}
+
+export const STRUCTURE_RULES: Partial<Record<SplitStatus, StructureRules>> = {
+  hllv: { minSquadsPerPlatoon: 2, minPlatoonsPerCompany: 2, minCompanies: 1, maxCompanies: 4 },
+  hllww2: { minSquadsPerPlatoon: 2, minPlatoonsPerCompany: 2, minCompanies: 1, maxCompanies: 2 },
+};
 
 const COMPANY_NAMES: Record<string, string> = {
   A: "Able", B: "Baker", C: "Charlie", D: "Dog",
   E: "Easy", F: "Fox", G: "George", H: "How",
 };
-
-const SQUADS_PER_PLATOON = 3;
 
 function mosCounts(people: Soldier[]): CountStat[] {
   const counts = new Map<string, number>();
@@ -50,18 +73,40 @@ function mosCounts(people: Soldier[]): CountStat[] {
     .map(([label, value]) => ({ label, value }));
 }
 
+// Greedily assigns whole practice-time clusters (largest first) to whichever
+// bin currently has the fewest squads, so clusters stay together (squads
+// that train together stay in one company/platoon) while bin sizes stay
+// roughly balanced. A cluster bigger than the target average still lands
+// whole in one bin rather than being split.
+function packClustersIntoBins<T extends { length: number }>(
+  clusters: T[][],
+  binCount: number,
+): T[][] {
+  const bins: T[][] = Array.from({ length: binCount }, () => []);
+  const sizes = new Array(binCount).fill(0);
+  for (const cluster of clusters) {
+    let target = 0;
+    for (let i = 1; i < binCount; i++) if (sizes[i] < sizes[target]) target = i;
+    bins[target].push(...cluster);
+    sizes[target] += cluster.length;
+  }
+  return bins;
+}
+
 export function suggestCompanies(
   source: RosterData,
   status: SplitStatus,
   options: { excludeCompanies?: string[]; usedLetters?: string[] } = {},
-): SuggestedCompany[] {
+): SuggestionResult {
+  const rules = STRUCTURE_RULES[status];
+  if (!rules) return { companies: [], warnings: [] };
   const excluded = new Set(options.excludeCompanies ?? []);
 
   // Old squads with anyone tagged for this battalion become suggested units.
   const units: SuggestedSquad[] = [];
   for (const company of [...source.battalion.companies, source.unassigned]) {
     if (excluded.has(company.letter)) continue;
-    const companyLabel = company.letter === "UNASSIGNED" ? "B/ACD" : company.letter;
+    const companyLabel = company.letter === "UNASSIGNED" ? "Unassigned" : company.letter;
     for (const platoon of company.platoons) {
       for (const squad of platoon.squads) {
         const everyone = [...(squad.leader ? [squad.leader] : []), ...squad.members];
@@ -78,36 +123,110 @@ export function suggestCompanies(
       }
     }
   }
-  if (units.length === 0) return [];
+  if (units.length === 0) return { companies: [], warnings: [] };
 
-  // Cluster by practice time — one suggested company per time slot, largest
-  // cluster first so it lands the earliest free letter.
-  const clusters = new Map<string, SuggestedSquad[]>();
+  const warnings: string[] = [];
+  const everyoneTagged = units.flatMap((u) => [...(u.leader ? [u.leader] : []), ...u.members]);
+  const officerCount = everyoneTagged.filter((s) => classifyTier(s) === "officer").length;
+  const seniorNcoCount = everyoneTagged.filter((s) => classifyTier(s) === "seniorNco").length;
+  const juniorNcoCount = everyoneTagged.filter((s) => classifyTier(s) === "juniorNco").length;
+
+  // Company count is driven by squad availability and the battalion's own
+  // cap — NOT by leadership. Leadership (especially senior NCO — cavalry-wide
+  // there are far fewer 1SG/SGM/MSG/SFC-tier people than officers) is
+  // reported as a warning instead: billets can be filled from outside the
+  // usual tier (see click-to-assign's "Show all ranks"), so a scarce tier
+  // shouldn't silently shrink the suggested structure.
+  const minSquadsPerCompany = rules.minSquadsPerPlatoon * rules.minPlatoonsPerCompany;
+  const maxCompaniesBySquads = Math.max(1, Math.floor(units.length / minSquadsPerCompany));
+  const companies = Math.min(rules.maxCompanies, Math.max(rules.minCompanies, maxCompaniesBySquads));
+
+  if (units.length < minSquadsPerCompany) {
+    warnings.push(
+      `Only ${units.length} squad${units.length === 1 ? "" : "s"} tagged — fewer than the ` +
+        `minimum standard (${rules.minPlatoonsPerCompany} platoons × ${rules.minSquadsPerPlatoon} ` +
+        `squads = ${minSquadsPerCompany}) for even one company.`,
+    );
+  }
+
+  // Cluster by practice time, largest first, then bin-pack whole clusters
+  // into the decided company count.
+  const clusterMap = new Map<string, SuggestedSquad[]>();
   for (const unit of units) {
     const key = unit.practiceTime ?? "No practice time set";
-    clusters.set(key, [...(clusters.get(key) ?? []), unit]);
+    clusterMap.set(key, [...(clusterMap.get(key) ?? []), unit]);
   }
+  const clusters = [...clusterMap.values()].sort((a, b) => b.length - a.length);
+  const companyBins = packClustersIntoBins(clusters, companies)
+    .filter((bin) => bin.length > 0)
+    .sort((a, b) => b.length - a.length);
+
   const freeLetters = "ABCDEFGH".split("").filter((l) => !(options.usedLetters ?? []).includes(l));
 
-  return [...clusters.entries()]
-    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
-    .map(([practiceTime, squads], index) => {
-      const letter = freeLetters[index] ?? `X${index + 1}`;
-      const platoons: SuggestedPlatoon[] = [];
-      for (let i = 0; i < squads.length; i += SQUADS_PER_PLATOON) {
-        platoons.push({
-          number: String(platoons.length + 1),
-          squads: squads.slice(i, i + SQUADS_PER_PLATOON),
-        });
-      }
-      return {
-        letter,
-        name: COMPANY_NAMES[letter] ?? letter,
-        practiceTime,
-        platoons,
-        headcount: squads.reduce((sum, s) => sum + (s.leader ? 1 : 0) + s.members.length, 0),
-      };
-    });
+  const result: SuggestedCompany[] = companyBins.map((squads, index) => {
+    const letter = freeLetters[index] ?? `X${index + 1}`;
+    const k = squads.length;
+    // Aim for ~3 squads/platoon, never below the minimum platoon count, and
+    // never so many platoons that squads/platoon would dip under the
+    // per-platoon minimum (best effort — flagged below if even the minimum
+    // platoon count can't be reached with this few squads).
+    const maxPlatoonsBySquads = Math.max(1, Math.floor(k / rules.minSquadsPerPlatoon));
+    const idealPlatoons = Math.max(1, Math.round(k / 3));
+    const platoonCount = Math.min(maxPlatoonsBySquads, Math.max(rules.minPlatoonsPerCompany, idealPlatoons));
+    if (platoonCount < rules.minPlatoonsPerCompany) {
+      warnings.push(
+        `${COMPANY_NAMES[letter] ?? letter} Company (${letter}) only has enough squads for ` +
+          `${platoonCount} platoon(s) — below the ${rules.minPlatoonsPerCompany}-platoon minimum.`,
+      );
+    }
+
+    const platoons: SuggestedPlatoon[] = [];
+    const base = Math.floor(k / platoonCount);
+    const extra = k % platoonCount;
+    let cursor = 0;
+    for (let p = 0; p < platoonCount; p++) {
+      const size = base + (p < extra ? 1 : 0);
+      platoons.push({ number: String(p + 1), squads: squads.slice(cursor, cursor + size) });
+      cursor += size;
+    }
+
+    const practiceTimes = [...new Set(squads.map((s) => s.practiceTime ?? "No practice time set"))].sort();
+    return {
+      letter,
+      name: COMPANY_NAMES[letter] ?? letter,
+      practiceTimes,
+      platoons,
+      headcount: squads.reduce((sum, s) => sum + (s.leader ? 1 : 0) + s.members.length, 0),
+    };
+  });
+
+  // Leadership warnings, computed against the structure actually produced
+  // (not a hypothetical minimum) so the numbers are accurate to what's on
+  // screen. These never change the structure — see the comment above.
+  const totalPlatoons = result.reduce((sum, c) => sum + c.platoons.length, 0);
+  const officersNeeded = result.length + totalPlatoons; // 1 CO + 1 PL/platoon
+  const seniorNcoNeeded = result.length + totalPlatoons; // 1 1SG + 1 PSG/platoon
+  if (officerCount < officersNeeded) {
+    warnings.push(
+      `Only ${officerCount} officers available for ${officersNeeded} CO/Platoon Leader billets ` +
+        `in this structure — some will need a leader from another tier (click-to-assign's ` +
+        `"Show all ranks" supports this).`,
+    );
+  }
+  if (seniorNcoCount < seniorNcoNeeded) {
+    warnings.push(
+      `Only ${seniorNcoCount} senior NCOs available for ${seniorNcoNeeded} 1SG/Platoon Sergeant ` +
+        `billets in this structure — some will need a leader from another tier.`,
+    );
+  }
+  if (juniorNcoCount < units.length) {
+    warnings.push(
+      `Only ${juniorNcoCount} junior NCOs available for ${units.length} squad-leader billets — ` +
+        `${units.length - juniorNcoCount} squad(s) will need a leader from another tier.`,
+    );
+  }
+
+  return { companies: result, warnings };
 }
 
 // Materializes suggestions into a committed battalion roster: creates the

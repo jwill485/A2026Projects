@@ -10,7 +10,7 @@ const UNASSIGNED_LETTER = "UNASSIGNED";
 
 function companyLabel(company: Company): string {
   return company.letter === UNASSIGNED_LETTER
-    ? "Unassigned (B/ACD)"
+    ? "Unassigned"
     : `${company.name} Company (${company.letter})`;
 }
 

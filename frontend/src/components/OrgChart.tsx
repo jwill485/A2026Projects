@@ -101,7 +101,7 @@ function CompanyBox({
     <li>
       <div className={`chart-node chart-company${isUnassigned ? " chart-unassigned" : ""}`}>
         <div className="chart-title">
-          {isUnassigned ? "Unassigned (B/ACD)" : `${company.name} Company (${company.letter})`}
+          {isUnassigned ? "Unassigned" : `${company.name} Company (${company.letter})`}
         </div>
         <div className="chart-role">CO: {troopLabel(company.commander)}</div>
         <div className="chart-role">XO: {troopLabel(company.executiveOfficer)}</div>

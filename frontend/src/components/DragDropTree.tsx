@@ -425,7 +425,7 @@ function paneOptions(roster: RosterData): { value: string; label: string }[] {
       value: c.letter,
       label: `${c.name} Company (${c.letter})`,
     })),
-    { value: roster.unassigned.letter, label: "Unassigned (B/ACD)" },
+    { value: roster.unassigned.letter, label: "Unassigned" },
   ];
 }
 
@@ -456,7 +456,7 @@ export function DragDropTree({
   onImportCompany,
   onSetSplitStatus,
   filter = EMPTY_FILTER,
-  unassignedHint = "From B/ACD — drag troopers into Charlie Company (or anywhere else) to reassign them.",
+  unassignedHint = "From Unassigned — drag troopers into Charlie Company (or anywhere else) to reassign them.",
 }: {
   roster: RosterData;
   rosterId: string;

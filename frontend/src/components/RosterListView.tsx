@@ -67,7 +67,7 @@ function CompanyLines({ company, hideVacant }: { company: Company; hideVacant: b
   return (
     <li className="list-company">
       <div className="list-company-title">
-        {isUnassigned ? "Unassigned (B/ACD)" : `${company.name} Company (${company.letter})`}
+        {isUnassigned ? "Unassigned" : `${company.name} Company (${company.letter})`}
       </div>
       <BilletLine label="CO" soldier={company.commander} hideVacant={hideVacant} />
       <BilletLine label="XO" soldier={company.executiveOfficer} hideVacant={hideVacant} />
@@ -152,7 +152,7 @@ export function RosterListView({ battalion, unassigned }: { battalion: Battalion
                 {c.name} Company ({c.letter})
               </option>
             ))}
-            {hasUnassigned && <option value="UNASSIGNED">Unassigned (B/ACD)</option>}
+            {hasUnassigned && <option value="UNASSIGNED">Unassigned</option>}
           </select>
         </label>
         <label>

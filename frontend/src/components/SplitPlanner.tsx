@@ -10,7 +10,7 @@ import {
 } from "../lib/analytics";
 import { bucketByTier, TIER_BILLETS, TIER_LABELS, TIER_ORDER } from "../lib/leadership";
 import { INTACT_TRANSFER, SPLIT_GROUPS } from "../lib/splitReorg";
-import { suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
+import { STRUCTURE_RULES, suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
 import { parseSplitTagCsv, type SplitTagImportResult, type SplitTagRow } from "../lib/splitTagImport";
 import "./SplitPlanner.css";
 
@@ -290,9 +290,9 @@ export function SplitPlanner({
                 checked={!!roster.sendCharlieToHllv}
                 onChange={(e) => onSetCharlieToHllv(e.target.checked)}
               />{" "}
-              Send Charlie Company (C/2-7) to HLLV <strong>intact</strong> — tags all its members
-              HLLV now; Commit carries the whole company (structure, leadership, practice times)
-              straight into HLLV instead of through its pool.
+              Send B/ACD to Charlie Company (C/2-7), then send C/2-7 to HLLV{" "}
+              <strong>intact</strong> — Commit carries them as one unit (structure, leadership,
+              practice times) straight into HLLV instead of through its pool.
             </label>
           )}
       </section>
@@ -355,7 +355,7 @@ export function SplitPlanner({
                       <div key={company.letter} className="practice-company">
                         <h4>
                           {company.letter === "UNASSIGNED"
-                            ? "Unassigned (B/ACD)"
+                            ? "Unassigned"
                             : `${company.name} Company (${company.letter})`}
                         </h4>
                         {company.platoons.flatMap((platoon) =>
@@ -473,16 +473,16 @@ export function SplitPlanner({
             {builds.map((b) => {
               // Suggestions come from the SOURCE roster's tags + practice
               // times, so they're only meaningful when planning from it.
-              const suggestions =
+              const { companies: suggestions, warnings: suggestionWarnings } =
                 b.data && activeConfiguration !== "new"
                   ? suggestCompanies(roster, b.status, {
                       excludeCompanies:
                         roster.sendCharlieToHllv && b.status === INTACT_TRANSFER.status
-                          ? [INTACT_TRANSFER.letter]
+                          ? [INTACT_TRANSFER.letter, roster.unassigned.letter]
                           : [],
                       usedLetters: b.data.battalion.companies.map((c) => c.letter),
                     })
-                  : [];
+                  : { companies: [], warnings: [] };
               return (
                 <div key={b.status} className={`group-card group-${b.status}`}>
                   <h4>{b.name}</h4>
@@ -501,15 +501,27 @@ export function SplitPlanner({
                         {suggestions.length === 1 ? "company" : "companies"} from practice times
                       </summary>
                       <p className="suggestion-hint">
-                        Old squads kept intact, grouped into companies by practice time, MOS makeup
-                        shown per squad. Applying places the squads and leaves every leadership
-                        billet vacant for you to fill.
+                        Old squads kept intact, grouped into companies by practice time, sized to
+                        {" "}{b.name === "HLLV" ? "HLLV's" : "HLLWW2's"} structure standards (min{" "}
+                        {STRUCTURE_RULES[b.status]?.minSquadsPerPlatoon} squads/platoon, min{" "}
+                        {STRUCTURE_RULES[b.status]?.minPlatoonsPerCompany} platoons/company, max{" "}
+                        {STRUCTURE_RULES[b.status]?.maxCompanies} compan
+                        {STRUCTURE_RULES[b.status]?.maxCompanies === 1 ? "y" : "ies"}) and checked
+                        against available leadership. Applying places the squads and leaves every
+                        leadership billet vacant for you to fill.
                       </p>
+                      {suggestionWarnings.length > 0 && (
+                        <ul className="suggestion-warnings">
+                          {suggestionWarnings.map((w) => (
+                            <li key={w}>{w}</li>
+                          ))}
+                        </ul>
+                      )}
                       {suggestions.map((sc) => (
                         <div key={sc.letter} className="suggestion-company">
                           <h5>
-                            {sc.name} Company ({sc.letter}) — {sc.practiceTime} · {sc.headcount}{" "}
-                            troopers
+                            {sc.name} Company ({sc.letter}) — {sc.practiceTimes.join(" · ")} ·{" "}
+                            {sc.headcount} troopers
                           </h5>
                           {sc.platoons.map((sp) => (
                             <div key={sp.number} className="suggestion-platoon">

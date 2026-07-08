@@ -233,10 +233,12 @@ function App() {
     handleChange({ ...roster, leadershipAccepted: true });
   }
 
-  // "Send Charlie to HLLV intact": tags all of C's members HLLV immediately
-  // (so the sort counts and leadership review reflect it) and sets the flag
-  // Commit reads to carry the whole company over. Composition changed either
-  // way, so the leadership sign-off resets.
+  // "Send Charlie to HLLV intact": tags all of C's AND the B/ACD pool's
+  // members HLLV immediately (B/ACD is treated as stored under C/2-7 for
+  // this transfer — see INTACT_TRANSFER) so the sort counts and leadership
+  // review reflect it, and sets the flag Commit reads to carry both over as
+  // one unit. Composition changed either way, so the leadership sign-off
+  // resets.
   function handleSetCharlieToHllv(enabled: boolean) {
     if (!roster) return;
     const next = structuredClone(roster);
@@ -247,6 +249,7 @@ function App() {
       if (charlie) {
         for (const soldier of collectCompanySoldiers(charlie)) soldier.splitStatus = "hllv";
       }
+      for (const soldier of collectCompanySoldiers(next.unassigned)) soldier.splitStatus = "hllv";
     }
     handleChange(next);
   }

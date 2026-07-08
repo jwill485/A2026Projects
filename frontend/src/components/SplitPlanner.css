@@ -271,6 +271,20 @@
   font-weight: 600;
 }
 
+.suggestion-warnings {
+  margin: 0.3rem 0;
+  padding: 0.3rem 0.6rem 0.3rem 1.4rem;
+  border: 1px dashed #d97757;
+  border-radius: 6px;
+  background: #241c1c;
+  color: #e0a08a;
+  font-size: 0.78rem;
+}
+
+.suggestion-warnings li {
+  padding: 0.1rem 0;
+}
+
 .suggestion-hint {
   color: #9b9;
   font-size: 0.78rem;

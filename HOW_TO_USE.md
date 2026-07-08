@@ -7,32 +7,42 @@ new configuration — without touching the real 2-7 data.
 
 ## Running it locally
 
-You need two things running at once: the backend (proxies the 7Cav API and
-keeps the API key server-side) and the frontend (the UI).
+Every time you want to use the app, you need **two terminal windows open at
+the same time** — one for the backend, one for the frontend. Leave both
+running while you use the app; closing either one stops that half. (One-time
+setup — venv, `pip install`, `npm install`, the `.env` file — is already done
+on this machine, so day-to-day you just need the four commands below.)
 
-**Backend**
+**Terminal 1 — backend**
+
+Open a terminal (PowerShell is fine) and run:
 ```
-cd backend
-python -m venv .venv          # first time only
-.venv\Scripts\activate        # Windows
-pip install -r requirements.txt
+cd "C:\Users\cskat\OneDrive\Desktop\7Cav\RosterManager\backend"
+.venv\Scripts\activate
 uvicorn app.main:app --reload --port 8000
 ```
-Make sure a `.env` file exists at the repo root with:
-```
-MILPACS_API_KEY=your_key_here
-```
+You'll know it worked when you see a line like `Uvicorn running on
+http://127.0.0.1:8000`. Leave this window open.
 
-**Frontend**
+**Terminal 2 — frontend**
+
+Open a **second** terminal (don't reuse the first one) and run:
 ```
-cd frontend
-npm install                   # first time only
+cd "C:\Users\cskat\OneDrive\Desktop\7Cav\RosterManager\frontend"
 npm run dev
 ```
-Then open the URL Vite prints (usually `http://localhost:5173`).
+You'll know it worked when it prints a `Local:` URL — usually
+`http://localhost:5173`. Open that link in your browser. Leave this window
+open too.
 
-The frontend expects the backend at `http://localhost:8000` and the backend
-only accepts requests from `http://localhost:5173` — if you change either
+**When you're done for the session**, just close both terminal windows (or
+press `Ctrl+C` in each, then close them) — that's the same as the servers
+being "shut down."
+
+If something won't load: check both windows are still open and didn't print
+an error, and that the browser URL matches what Terminal 2 printed. The
+frontend expects the backend at `http://localhost:8000` and the backend only
+accepts requests from `http://localhost:5173` — if you ever change either
 port, update `frontend/src/lib/api.ts` and `backend/app/main.py` to match.
 
 ## Rosters (top-left box)
@@ -186,9 +196,9 @@ pane instead of two.
   typing everyone in by hand. Already-imported troopers show **Added** and
   can't be added twice.
 - **+ Import Company** — brings in an *entire* real company at once —
-  Able, Baker, Charlie, Easy, or **Unassigned (B/ACD)** — with its full
+  Able, Baker, Charlie, Easy, or **Unassigned** — with its full
   platoon/squad structure and leadership intact, instead of adding people one
-  at a time. Importing Unassigned (B/ACD) merges its real structure into your
+  at a time. Importing Unassigned merges its real structure into your
   roster's own Unassigned pool (every roster already has one, so it doesn't
   show up as a separate pane). If a trooper from that company already exists
   elsewhere in your roster (e.g. you'd already imported them individually),
@@ -252,9 +262,12 @@ just overwrite earlier ones.
 
 If Charlie Company is going to HLLV wholesale, skip sorting it person by
 person: tick **Send Charlie Company (C/2-7) to HLLV intact** on the same
-card. That tags all of C's members HLLV immediately, and when you commit,
-the entire company — structure, leadership, and practice times — lands in
-HLLV exactly as it is today instead of its people going through the pool.
+card. B/ACD is currently where Charlie's real people live (the live Charlie
+shell itself is empty), so checking this box tags **both** C's members and
+everyone in the B/ACD pool HLLV immediately. When you commit, B/ACD's
+platoons get folded in under Charlie's own and the whole thing — structure,
+leadership, and practice times — lands in HLLV as one unit, instead of
+either group going through the pool.
 
 **2. Practice times.** One question: accept the current practice times, or
 edit them first? **Accept current practice times** fills in the known 2-7
@@ -296,12 +309,23 @@ rosters rather than duplicating them.
 the pool) and gives you an **Open in Drag & Drop** button per battalion.
 Each battalion also gets a **💡 Suggested structure**: your old squads kept
 intact, grouped into proposed companies by practice time, with each squad's
-origin and MOS makeup listed. **Apply suggested structure** builds it in
-one click — squads placed, every leadership billet left vacant on purpose —
-and it lands as unsaved changes on that roster, so you can open it, review,
-tweak, and Save (or Revert to throw it away). Then fill leadership top-down:
-click the vacant Battalion CO/XO/SGM billets to pick from the officer/NCO
-lists, and work down through company and platoon leadership the same way.
+origin and MOS makeup listed. The size follows each battalion's standards —
+**HLLV** (the priority battalion) can go up to **4 companies**, **HLLWW2**
+is capped at **1–2**; both want at least **2 platoons per company** and
+**2 squads per platoon**. How many companies actually get suggested also
+depends on leadership: each company needs a CO and 1SG, each platoon a PL
+and PSG, so if you don't have enough officers or senior NCOs tagged yet, the
+suggestion shrinks the company count to match rather than proposing more
+than you can staff — you'll see a note explaining why when that happens (and
+similar notes if there aren't enough squads yet, or not enough junior NCOs
+for all the squad-leader slots).
+
+**Apply suggested structure** builds it in one click — squads placed, every
+leadership billet left vacant on purpose — and it lands as unsaved changes
+on that roster, so you can open it, review, tweak, and Save (or Revert to
+throw it away). Then fill leadership top-down: click the vacant Battalion
+CO/XO/SGM billets to pick from the officer/NCO lists, and work down through
+company and platoon leadership the same way.
 
 The split toggles only appear on the source roster — rosters tagged **New**
 (the split's outputs) hide them, and the Battalion Roster tab's badge always

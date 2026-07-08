@@ -11,7 +11,11 @@ export const SPLIT_GROUPS: { name: string; status: SplitStatus }[] = [
 
 // When RosterData.sendCharlieToHllv is set, this company transfers to this
 // battalion intact on commit: structure, leadership, and practice times all
-// carried over, members bypassing the Unassigned pool entirely.
+// carried over, members bypassing the Unassigned pool entirely. The B/ACD
+// pool is folded in under this company too (its platoons appended, renumbered
+// past Charlie's own) — B/ACD holds Charlie's real people while the live
+// Charlie shell is empty, so it's treated as stored under C/2-7 for the
+// purposes of this transfer.
 export const INTACT_TRANSFER: { letter: string; status: SplitStatus } = {
   letter: "C",
   status: "hllv",
@@ -30,20 +34,38 @@ export function buildSplitRoster(
   rankOrder?: Map<string, number>,
   carryIntact = false,
 ): RosterData {
-  // With the intact transfer active, that company's members never enter
-  // either battalion's pool — regardless of individual tags — because the
-  // whole company moves as one unit to its destination battalion.
-  const intactSource = carryIntact
-    ? source.battalion.companies.find((c) => c.letter === INTACT_TRANSFER.letter)
-    : undefined;
-  const intactMemberIds = new Set(
-    intactSource ? collectCompanySoldiers(intactSource).map((s) => s.userId) : [],
-  );
+  // With the intact transfer active, Charlie's (and B/ACD's) members never
+  // enter either battalion's pool — regardless of individual tags — because
+  // the whole unit moves together to its destination battalion.
   const carriedCompanies: Company[] = [];
-  if (intactSource && INTACT_TRANSFER.status === status) {
-    const copy = structuredClone(intactSource);
-    for (const soldier of collectCompanySoldiers(copy)) delete soldier.splitStatus;
-    carriedCompanies.push(copy);
+  const intactMemberIds = new Set<string>();
+  if (carryIntact && INTACT_TRANSFER.status === status) {
+    const charlie = source.battalion.companies.find((c) => c.letter === INTACT_TRANSFER.letter);
+    const hasUnassignedStructure = source.unassigned.platoons.length > 0;
+    if (charlie || hasUnassignedStructure) {
+      const copy: Company = charlie
+        ? structuredClone(charlie)
+        : makeCompany(INTACT_TRANSFER.letter, "Charlie");
+      if (hasUnassignedStructure) {
+        // Append B/ACD's platoons under Charlie, renumbered past Charlie's
+        // own so the numbers don't collide (same next-available scheme as
+        // addPlatoon).
+        const nextNumber = copy.platoons.reduce((max, p) => Math.max(max, Number(p.number) || 0), 0) + 1;
+        const foldedIn = structuredClone(source.unassigned.platoons);
+        foldedIn.forEach((platoon, i) => {
+          platoon.number = String(nextNumber + i);
+        });
+        copy.platoons.push(...foldedIn);
+      }
+      for (const soldier of collectCompanySoldiers(copy)) delete soldier.splitStatus;
+      carriedCompanies.push(copy);
+      for (const soldier of collectCompanySoldiers(charlie ?? makeCompany("", ""))) {
+        intactMemberIds.add(soldier.userId);
+      }
+      for (const soldier of collectCompanySoldiers(source.unassigned)) {
+        intactMemberIds.add(soldier.userId);
+      }
+    }
   }
 
   const troopers: Soldier[] = collectAllSoldiers(source)

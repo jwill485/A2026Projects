@@ -165,10 +165,15 @@ stays usable throughout:
    phases without doing the real sort first. A **Send Charlie Company
    (C/2-7) to HLLV intact** checkbox (`RosterData.sendCharlieToHllv`,
    `INTACT_TRANSFER` in `splitReorg.ts`) short-circuits sorting for that
-   company: checking it tags all of C's members HLLV immediately, and on
-   commit the whole company — structure, leadership, practice times — is
-   carried into HLLV's battalion as-is, its members bypassing both pools
-   entirely (regardless of any individual re-tags). The toggles (and these
+   company: checking it tags all of C's members **and the B/ACD pool's**
+   HLLV immediately (B/ACD is currently the real home of Charlie's people
+   while the live Charlie shell is empty, so it's treated as stored under
+   C/2-7 for this transfer). On commit, `buildSplitRoster` folds B/ACD's
+   platoons in under Charlie's own (renumbered past Charlie's own platoon
+   numbers, same next-available scheme as `+ Add Platoon`) and carries the
+   merged company — structure, leadership, practice times — into HLLV's
+   battalion as one unit, both groups bypassing every pool entirely
+   (regardless of any individual re-tags). The toggles (and these
    buttons) are hidden entirely on rosters tagged **New** — tagging only
    means something on the source roster.
 2. **Practice times** — asks one question: accept the current practice
@@ -176,8 +181,8 @@ stays usable throughout:
    known real 2-7 schedule (`practiceDefaults.ts` — e.g. all of Able at
    THU 2359z, Baker by platoon, Easy and the B/ACD pool by squad) and
    signs the set off in one click. **Edit** expands a per-squad table —
-   the active roster's current squads including the Unassigned (B/ACD)
-   pool's, grouped by company, each row showing the squad's MOS makeup
+   the active roster's current squads including the Unassigned pool's,
+   grouped by company, each row showing the squad's MOS makeup
    (via `computeSquadMos`) beside a free-text time input, pre-filled with
    the same defaults — and **Save practice times** signs off and
    collapses it. The sign-off is `RosterData.practiceTimesConfirmed`;
@@ -212,14 +217,38 @@ stays usable throughout:
    **Open in Drag & Drop** button that switches roster + tab in one click.
    Each battalion card also shows a **💡 Suggested structure**
    (`buildSuggestions.ts`): old squads kept intact as units, clustered by
-   practice time into proposed companies (up to 3 squads per platoon),
-   each squad annotated with its source (e.g. "from A/1/2"), headcount,
-   and MOS makeup. **Apply suggested structure** materializes it into the
-   committed roster — squads placed with practice times carried, every
-   leadership billet deliberately left vacant for click-to-assign (§2.3) —
-   saved but not baselined, so it shows up as reviewable pending changes.
-   Intended order: Battalion CO/XO/SGM first, then companies (applied or
-   hand-built), then leadership down through platoons/squads.
+   practice time into proposed companies, each squad annotated with its
+   source (e.g. "from A/1/2"), headcount, and MOS makeup. Sizing follows
+   each battalion's structure standards (`STRUCTURE_RULES`) rather than a
+   fixed shape:
+
+   | | min squads/platoon | min platoons/company | company count |
+   |---|---|---|---|
+   | **HLLV** (priority battalion) | 2 | 2 | up to 4 |
+   | **HLLWW2** | 2 | 2 | 1–2 |
+
+   Company count is the flexible lever: it's the largest value that (a)
+   the tagged squad count can support at minimum size, (b) available
+   leadership can staff (each company needs 1 CO + 1 1SG, each of its
+   platoons 1 PL + 1 PSG — officers and senior NCOs are counted from the
+   tagged pool and the tighter of the two caps the result), and (c) the
+   battalion's own cap (4 for HLLV, 2 for HLLWW2) — whichever is smallest,
+   with a floor of 1. Practice-time clusters are bin-packed (largest
+   first, into whichever company currently has the fewest squads) so
+   squads that train together stay together whenever the company count
+   allows it, rather than one company per distinct time slot. Platoon
+   count per company targets ~3 squads/platoon without dropping below the
+   minimum. When squads or leadership fall short of a clean fit — too few
+   squads for even one company, leadership capping company count below
+   what squads could otherwise support, or fewer junior NCOs than squads
+   needing a leader — a warning explains what's short rather than silently
+   producing an invalid structure. **Apply suggested structure**
+   materializes it into the committed roster — squads placed with
+   practice times carried, every leadership billet deliberately left
+   vacant for click-to-assign (§2.3) — saved but not baselined, so it
+   shows up as reviewable pending changes. Intended order: Battalion
+   CO/XO/SGM first, then companies (applied or hand-built), then
+   leadership down through platoons/squads.
 
 The older manual path (Import Company/Import Trooper into hand-created
 rosters) still works and can be mixed in freely.
@@ -333,7 +362,7 @@ interface RosterData {
   unassigned: Company;   // the B/ACD-style holding pool; every roster has exactly one
   practiceTimesConfirmed?: boolean; // §2.9 phase 2 sign-off; gates Commit Split
   leadershipAccepted?: boolean;     // §2.9 phase 3 sign-off; gates Commit Split
-  sendCharlieToHllv?: boolean;      // §2.9: carry C/2-7 into HLLV intact on commit
+  sendCharlieToHllv?: boolean;      // §2.9: carry C/2-7 + B/ACD into HLLV intact on commit
 }
 ```
 
@@ -563,14 +592,15 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 ### 8.3 Other Not-Yet-Built Ideas
 
 - **Unit Builder redesign — remaining ideas:** the first round is built
-  (click-to-assign with tier-filtered candidate pickers §2.3, practice-time
-  clustered build suggestions §2.9 phase 5, the C→HLLV intact transfer).
-  Still open if wanted: a dedicated step-by-step build surface that walks
-  battalion HQ → company leadership → platoon leadership → squads as
-  explicit stages rather than one open tree; generalizing the intact
-  transfer to any company → either battalion; and smarter suggestion
-  heuristics (MOS balancing across platoons, e.g. spreading medics, rather
-  than clustering purely by practice time).
+  (click-to-assign with tier-filtered candidate pickers §2.3, structure- and
+  leadership-aware build suggestions §2.9 phase 5, the C→HLLV intact
+  transfer). Still open if wanted: a dedicated step-by-step build surface
+  that walks battalion HQ → company leadership → platoon leadership →
+  squads as explicit stages rather than one open tree; generalizing the
+  intact transfer to any company → either battalion; and smarter
+  suggestion heuristics (MOS balancing *within* a company's platoons, e.g.
+  spreading medics evenly, on top of the current practice-time clustering
+  and leadership-capacity sizing).
 - **Personnel query tab:** a separate tab for querying MILPACS profile data
   about troopers in 2-7 and B/ACD — graduations, disciplinary records,
   awards, secondary billets, ranks, and MOS. The full (non-lite) roster
@@ -645,7 +675,7 @@ Repo layout:
 2-7 CAVALRY BATTALION (CO: Colonel Cam)
 ├── Battalion HQ
 │   ├── Commanding Officer (Colonel Cam)
-│   ├── Executive Officer (Captain)
+│   ├── Executive Officer (Lieutenant Colonel Mix)
 │   └── Sergeant Major
 ├── Able Company (CO: Captain)
 │   ├── 1st Platoon "Iron Crucible" (PSG: SPC Torres)
