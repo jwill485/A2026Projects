@@ -132,12 +132,14 @@ gaps between existing squad cards are too thin to reliably target). Moves
 the leader, assistant leader, and every member together; if the destination
 platoon already has a squad using that number, the incoming one is
 auto-renumbered (same next-available scheme as **+ Add Squad**) rather than
-colliding. **Known trade-off of the single-active-company layout:**
-whole-squad drag only reaches platoons within the *same* company, since a
-second company's squad list isn't rendered simultaneously — moving a whole
-squad to a *different* company isn't yet supported by any affordance
-(click-to-assign only moves one person at a time). Flagged as a fast-follow
-in §8.3.
+colliding. Dragging only reaches platoons within the *same* company, since a
+second company's squad list isn't rendered simultaneously — for the
+cross-company case, a **⇄** button next to the drag handle opens
+`MoveSquadPicker.tsx`, a click-to-move picker (same pattern as
+`CandidatePicker`) for choosing a destination company + platoon, with an
+inline **+ Add Platoon** if the target company doesn't have one yet.
+`moveSquad` (`moveSoldier.ts`) already supported an arbitrary destination
+company at the data layer — this was purely a missing UI affordance.
 
 When viewing a split-output roster (HLLV/HLLWW2) whose source roster is
 resolvable (see `RosterSummary.splitSourceId` in §3), the toolbar also shows
@@ -699,15 +701,10 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 ### 8.3 Other Not-Yet-Built Ideas
 
 - **Drag & Drop / Unit Builder — remaining ideas:** the Pool/Structure/Detail
-  workbench rework is built (§2.3), on top of the earlier click-to-assign
-  and structure/leadership-aware build suggestions (§2.9 phase 5) and the
-  C→HLLV intact transfer. Still open if wanted:
-  - **Whole-squad drag between two different companies** — currently only
-    works within the active company's own platoons, since a second
-    company's squad list isn't rendered at the same time (§2.3's "known
-    trade-off"). Would need either a lightweight "move squad to company"
-    picker (mirroring `CandidatePicker` but for a whole squad) or a way to
-    temporarily bring a second company's structure on screen.
+  workbench rework is built (§2.3), on top of the earlier click-to-assign,
+  structure/leadership-aware build suggestions (§2.9 phase 5), the C→HLLV
+  intact transfer, and cross-company whole-squad moves (§2.3). Still open if
+  wanted:
   - Generalizing the intact transfer (§2.9) to any company → either
     battalion, not just C→HLLV.
   - Smarter suggestion heuristics — MOS balancing *within* a company's
@@ -721,13 +718,6 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
     `Company.staged`/"Mark complete" only exists on individual companies;
     `BattalionHQ` (CO/XO/SGM) has no equivalent lock/"complete" state once
     the whole battalion's leadership is settled.
-- **Personnel query tab:** a separate tab for querying MILPACS profile data
-  about troopers in 2-7 and B/ACD — graduations, disciplinary records,
-  awards, secondary billets, ranks, and MOS. The full (non-lite) roster
-  endpoint already returns all of this per profile (`records[]` with
-  `recordType` GRADUATION/DISCIPLINARY/etc., `awards[]`, `secondaries[]`,
-  `mos`, `rank`), so this is a frontend query/filter UI plus a printable
-  list output (same print approach as §2.11).
 - **Rank/MOS validation:** flag rank-inappropriate or MOS-mismatched billet
   assignments.
 - **Notes/flags:** per-trooper notes (medical, discipline, promotion review).

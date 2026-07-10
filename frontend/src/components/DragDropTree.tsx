@@ -12,6 +12,7 @@ import {
   setCompanyStaged,
   type SlotPath,
   type SoldierPatch,
+  type SquadLocation,
 } from "../lib/moveSoldier";
 import {
   collectAllSoldiers,
@@ -37,6 +38,7 @@ import { ImportSoldierPicker } from "./ImportSoldierPicker";
 import { ImportCompanyPicker } from "./ImportCompanyPicker";
 import { SplitStatusToggle } from "./SplitStatusToggle";
 import { CandidatePicker } from "./CandidatePicker";
+import { MoveSquadPicker } from "./MoveSquadPicker";
 import { LeadershipStrip, type StripBillet } from "./LeadershipStrip";
 import { SuggestionPreview } from "./SuggestionPreview";
 import "./RosterTree.css";
@@ -59,6 +61,7 @@ interface Actions {
   onDeleteSoldier: (userId: string) => void;
   onSetSplitStatus?: (userId: string, status: SplitStatus) => void;
   onRequestAssign: (destination: SlotPath) => void;
+  onRequestMoveSquad: (location: SquadLocation) => void;
   onSelectUnit: (unit: SelectedUnit) => void;
   onToggleStaged: (letter: string) => void;
   // Whether the currently-displayed (active) company is staged/complete —
@@ -268,7 +271,7 @@ function DragDropSquad({
   company: string;
   platoon: string;
 }) {
-  const { onDeleteSquad, onRequestAssign, locked } = useActions();
+  const { onDeleteSquad, onRequestAssign, onRequestMoveSquad, locked } = useActions();
   const leaderDest: SlotPath = { kind: "squadLeader", company, platoon, squad: squad.number };
   const assistantDest: SlotPath = { kind: "squadAssistantLeader", company, platoon, squad: squad.number };
   const memberDest: SlotPath = { kind: "squadMember", company, platoon, squad: squad.number };
@@ -307,6 +310,18 @@ function DragDropSquad({
           </span>
         )}
         <DetailButton unit={{ kind: "squad", company, platoon, squad: squad.number }} />
+        <button
+          type="button"
+          className="icon-btn"
+          title={locked ? "Un-stage this company first" : "Move this whole squad to a different company"}
+          disabled={locked}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRequestMoveSquad({ company, platoon, squad: squad.number });
+          }}
+        >
+          ⇄
+        </button>
         <button
           type="button"
           className="icon-btn icon-btn-danger"
@@ -895,6 +910,7 @@ export function DragDropTree({
   const [importing, setImporting] = useState(false);
   const [importingCompany, setImportingCompany] = useState(false);
   const [assigning, setAssigning] = useState<SlotPath | null>(null);
+  const [movingSquad, setMovingSquad] = useState<SquadLocation | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<SelectedUnit | null>(null);
   const [newCompanyLetter, setNewCompanyLetter] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
@@ -993,6 +1009,7 @@ export function DragDropTree({
     onDeleteSoldier,
     onSetSplitStatus,
     onRequestAssign: setAssigning,
+    onRequestMoveSquad: setMovingSquad,
     onSelectUnit: setSelectedUnit,
     onToggleStaged: (letter) => {
       const target = roster.battalion.companies.find((c) => c.letter === letter);
@@ -1140,6 +1157,19 @@ export function DragDropTree({
             setAssigning(null);
           }}
           onClose={() => setAssigning(null)}
+        />
+      )}
+      {movingSquad && (
+        <MoveSquadPicker
+          roster={roster}
+          source={movingSquad}
+          onAddPlatoon={(company) => onChange(addPlatoon(roster, company))}
+          onMove={(destination) => {
+            const result = moveSquad(roster, movingSquad, destination);
+            if (result.ok) onChange(result.roster);
+            setMovingSquad(null);
+          }}
+          onClose={() => setMovingSquad(null)}
         />
       )}
     </ActionsContext.Provider>
