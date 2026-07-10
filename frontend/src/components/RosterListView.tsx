@@ -31,6 +31,7 @@ function SquadLines({ squad, hideVacant }: { squad: Squad; hideVacant: boolean }
     <li className="list-squad">
       Squad {squad.number}
       {(!hideVacant || squad.leader) && <> — Leader: {troopLabel(squad.leader)}</>}
+      {squad.assistantLeader && <> | Asst: {troopLabel(squad.assistantLeader)}</>}
       {squad.members.length > 0 && (
         <ul className="list-members">
           {squad.members.map((m) => (
@@ -123,9 +124,9 @@ export function RosterListView({ battalion, unassigned }: { battalion: Battalion
       ? filterCompanyForScope(unassigned, scope)
       : null;
 
-  const hqCommander = showBattalionHq ? keepInScope(battalion.commander, scope) : null;
-  const hqXo = showBattalionHq ? keepInScope(battalion.executiveOfficer, scope) : null;
-  const hqSgm = showBattalionHq ? keepInScope(battalion.sergeantMajor, scope) : null;
+  const hqCommander = showBattalionHq ? keepInScope(battalion.commander, "officer", scope) : null;
+  const hqXo = showBattalionHq ? keepInScope(battalion.executiveOfficer, "officer", scope) : null;
+  const hqSgm = showBattalionHq ? keepInScope(battalion.sergeantMajor, "seniorNco", scope) : null;
 
   function handleDownloadCsv() {
     const exportBattalion = showBattalionHq

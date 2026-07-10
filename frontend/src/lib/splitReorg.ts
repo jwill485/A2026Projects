@@ -1,6 +1,7 @@
 import type { Company, RosterData, Soldier, SplitStatus } from "../types/roster";
 import { makeBattalion, makeCompany } from "./rosterFactory";
 import { collectAllSoldiers, collectCompanySoldiers } from "./analytics";
+import { describeSoldierLocations } from "./changelog";
 
 // The two battalions 2-7 is splitting into. Roster names double as battalion
 // designations in the generated rosters.
@@ -80,11 +81,18 @@ export function buildSplitRoster(
     }
   }
 
+  // Once flattened into the sorted-by-rank pool below, there's no more
+  // structural trace of who served where in 2-7 — capture it as their
+  // origin now, while it's still known, so the Pool's "Former unit" filter
+  // has something to work with. Overwrites any earlier origin (e.g. from an
+  // old +Import Trooper) with their most recent 2-7 posting.
+  const sourceLocations = describeSoldierLocations(source);
   const troopers: Soldier[] = collectAllSoldiers(source)
     .filter((s) => s.splitStatus === status && !intactMemberIds.has(s.userId))
     .map((s) => {
       const copy: Soldier = structuredClone(s);
       delete copy.splitStatus;
+      copy.originLabel = sourceLocations.get(s.userId)?.label ?? copy.originLabel;
       return copy;
     });
 
@@ -102,7 +110,7 @@ export function buildSplitRoster(
       number: "0",
       leader: null,
       sergeant: null,
-      squads: [{ number: "0", leader: null, members: troopers }],
+      squads: [{ number: "0", leader: null, assistantLeader: null, members: troopers }],
     });
   }
 

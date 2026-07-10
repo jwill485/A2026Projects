@@ -24,6 +24,7 @@ function countCompanySoldiers(company: Company): number {
     if (platoon.sergeant) count += 1;
     for (const squad of platoon.squads) {
       if (squad.leader) count += 1;
+      if (squad.assistantLeader) count += 1;
       count += squad.members.length;
     }
   }
@@ -45,6 +46,7 @@ function withOriginLabels(company: Company, locations: Map<string, LocationInfo>
       squads: platoon.squads.map((squad) => ({
         ...squad,
         leader: tag(squad.leader),
+        assistantLeader: tag(squad.assistantLeader),
         members: squad.members.map((m) => ({ ...m, originLabel: locations.get(m.userId)?.label })),
       })),
     })),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchCombatRoster, fetchRanks } from "./lib/api";
 import { buildRosterData } from "./lib/buildRoster";
 import { makeBlankRoster, makeSoldier } from "./lib/rosterFactory";
@@ -71,6 +71,42 @@ function App() {
   const [tab, setTab] = useState<Tab>("split");
   const [rosterView, setRosterView] = useState<RosterView>("tree");
   const [rosterFilter, setRosterFilter] = useState<RosterFilter>(EMPTY_FILTER);
+  // Drag & Drop's "Suggest structure" needs the SOURCE roster's tags/practice
+  // times (see below) — loaded via effect, not on every render, since
+  // loadRoster does a localStorage read + JSON.parse of a whole separate
+  // roster. Re-runs whenever the active roster or roster list changes, which
+  // covers both switching rosters and the source roster being edited
+  // elsewhere (handleChange always persists immediately, so re-loading it
+  // on return picks up the latest).
+  const [sourceRosterForSuggestions, setSourceRosterForSuggestions] = useState<RosterData | null>(null);
+
+  useEffect(() => {
+    const activeConfig = rosterList.find((r) => r.id === rosterId)?.configuration;
+    const currentSummary = rosterList.find((r) => r.id === rosterId);
+    const suggestionStatus =
+      activeConfig === "new" ? (SPLIT_GROUPS.find((g) => g.name === currentSummary?.name)?.status ?? null) : null;
+    const splitSourceId = suggestionStatus ? currentSummary?.splitSourceId : undefined;
+    setSourceRosterForSuggestions(splitSourceId ? loadRoster(splitSourceId) : null);
+  }, [rosterId, rosterList]);
+
+  // Both walk the whole roster tree building label strings — expensive
+  // enough (especially describeSoldierLocations, called twice inside
+  // diffRosters) that recomputing on every render caused a noticeable
+  // delay clicking the roster dropdown / top action buttons, since those
+  // trigger a full App re-render regardless of which tab is showing. Must
+  // sit above the loading-state early return below (Rules of Hooks), hence
+  // the null-safe fallbacks.
+  const pendingChanges = useMemo(
+    () => (baseline && roster ? diffRosters(baseline, roster).length : 0),
+    [baseline, roster],
+  );
+  const mosOptions = useMemo(
+    () =>
+      roster
+        ? [...new Set(collectAllSoldiers(roster).map((s) => s.mos))].filter((mos) => mos.trim() !== "").sort()
+        : [],
+    [roster],
+  );
 
   function activateRoster(id: string) {
     setRosterView("tree");
@@ -430,7 +466,6 @@ function App() {
     );
   }
 
-  const pendingChanges = diffRosters(baseline, roster).length;
   const activeConfiguration = rosterList.find((r) => r.id === rosterId)?.configuration;
   // Tagging only makes sense on the split's *source* roster — hide the
   // toggles entirely on rosters that are themselves split outputs.
@@ -442,20 +477,15 @@ function App() {
     activeConfiguration === "new"
       ? "Troopers committed to this battalion, sorted by rank — assign Battalion HQ first, then build companies around your leadership (see Split Planner)."
       : undefined;
-  const mosOptions = [...new Set(collectAllSoldiers(roster).map((s) => s.mos))]
-    .filter((mos) => mos.trim() !== "")
-    .sort();
-
   // Drag & Drop's "Suggest structure" action needs the SOURCE roster's tags
   // + practice times — resolvable via splitSourceId, recorded on this roster
   // at Commit Split time (not the optional, user-set "old"/"new" tag).
+  // sourceRosterForSuggestions itself is loaded in the effect above.
   const currentSummary = rosterList.find((r) => r.id === rosterId);
   const suggestionStatus =
     activeConfiguration === "new"
       ? (SPLIT_GROUPS.find((g) => g.name === currentSummary?.name)?.status ?? null)
       : null;
-  const sourceRosterForSuggestions =
-    suggestionStatus && currentSummary?.splitSourceId ? loadRoster(currentSummary.splitSourceId) : null;
 
   return (
     <section id="center" style={{ alignItems: "stretch", maxWidth: tab === "dragdrop" ? "1400px" : "900px" }}>

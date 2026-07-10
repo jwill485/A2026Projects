@@ -32,6 +32,7 @@ function SquadBox({
       <div className="chart-node chart-squad">
         <div className="chart-title">Squad {squad.number}</div>
         <div className="chart-role">Leader: {troopLabel(squad.leader)}</div>
+        {squad.assistantLeader && <div className="chart-role">Asst: {troopLabel(squad.assistantLeader)}</div>}
         {squad.members.length > 0 && (
           <button type="button" className="chart-toggle" onClick={() => onToggle(squadKey)}>
             {expanded ? "Hide" : "Show"} {squad.members.length} member{squad.members.length === 1 ? "" : "s"}

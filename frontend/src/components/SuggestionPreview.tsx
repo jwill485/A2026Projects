@@ -55,7 +55,8 @@ export function SuggestionPreview({
               <ul>
                 {sp.squads.map((ss) => (
                   <li key={ss.sourceLabel}>
-                    from {ss.sourceLabel} — {(ss.leader ? 1 : 0) + ss.members.length} troopers ·{" "}
+                    from {ss.sourceLabel} —{" "}
+                    {(ss.leader ? 1 : 0) + (ss.assistantLeader ? 1 : 0) + ss.members.length} troopers ·{" "}
                     {ss.mos.map((m) => `${m.label} ×${m.value}`).join(" · ")}
                   </li>
                 ))}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import type { Battalion, Company, Platoon, RosterData, Soldier, SplitStatus, Squad } from "../types/roster";
 import type { ApiRankExpanded } from "../types/api";
@@ -20,7 +20,8 @@ import {
   computeSquadMos,
   practiceTimeByUser,
 } from "../lib/analytics";
-import { classifyTier, TIER_LABELS, TIER_ORDER, type LeadershipTier } from "../lib/leadership";
+import { computeEchelonMap, ECHELON_LABELS, ECHELON_ORDER, type BilletEchelon } from "../lib/leadership";
+import { originCompanyLabel } from "../lib/changelog";
 import { INTACT_TRANSFER } from "../lib/splitReorg";
 import { suggestCompanies, applySuggestedCompanies } from "../lib/buildSuggestions";
 import {
@@ -269,9 +270,10 @@ function DragDropSquad({
 }) {
   const { onDeleteSquad, onRequestAssign, locked } = useActions();
   const leaderDest: SlotPath = { kind: "squadLeader", company, platoon, squad: squad.number };
+  const assistantDest: SlotPath = { kind: "squadAssistantLeader", company, platoon, squad: squad.number };
   const memberDest: SlotPath = { kind: "squadMember", company, platoon, squad: squad.number };
-  const isEmpty = squad.leader === null && squad.members.length === 0;
-  const headcount = squad.members.length + (squad.leader ? 1 : 0);
+  const isEmpty = squad.leader === null && squad.assistantLeader === null && squad.members.length === 0;
+  const headcount = squad.members.length + (squad.leader ? 1 : 0) + (squad.assistantLeader ? 1 : 0);
   const mos = computeSquadMos(squad);
   const strip: StripBillet[] = [
     {
@@ -279,6 +281,12 @@ function DragDropSquad({
       filled: squad.leader !== null,
       detail: squad.leader ? `${squad.leader.rankShort} ${squad.leader.realName}` : undefined,
       onClick: squad.leader === null ? () => onRequestAssign(leaderDest) : undefined,
+    },
+    {
+      label: "ASL",
+      filled: squad.assistantLeader !== null,
+      detail: squad.assistantLeader ? `${squad.assistantLeader.rankShort} ${squad.assistantLeader.realName}` : undefined,
+      onClick: squad.assistantLeader === null ? () => onRequestAssign(assistantDest) : undefined,
     },
   ];
   return (
@@ -312,6 +320,15 @@ function DragDropSquad({
           ✕
         </button>
       </summary>
+      <div className="company-hq-row">
+        Asst:{" "}
+        <DroppableSlot
+          destination={assistantDest}
+          occupied={squad.assistantLeader !== null}
+          emptyLabel="VACANT"
+          soldier={squad.assistantLeader}
+        />
+      </div>
       <DroppableMemberList destination={memberDest} members={squad.members} />
     </details>
   );
@@ -354,11 +371,14 @@ function DragDropPlatoon({ platoon, company }: { platoon: Platoon; company: stri
   const total =
     (platoon.leader ? 1 : 0) +
     (platoon.sergeant ? 1 : 0) +
-    platoon.squads.reduce((sum, s) => sum + s.members.length + (s.leader ? 1 : 0), 0);
+    platoon.squads.reduce(
+      (sum, s) => sum + s.members.length + (s.leader ? 1 : 0) + (s.assistantLeader ? 1 : 0),
+      0,
+    );
   const isEmpty =
     platoon.leader === null &&
     platoon.sergeant === null &&
-    platoon.squads.every((s) => s.leader === null && s.members.length === 0);
+    platoon.squads.every((s) => s.leader === null && s.assistantLeader === null && s.members.length === 0);
   const squads = isFilterActive(filter)
     ? platoon.squads.filter((s) => squadHasMatch(s, filter))
     : platoon.squads;
@@ -593,20 +613,30 @@ function DroppablePool({ children }: { children: ReactNode }) {
 
 function PoolPanel({ roster }: { roster: RosterData }) {
   const [search, setSearch] = useState("");
-  const [tierFilter, setTierFilter] = useState<LeadershipTier | "">("");
+  const [echelonFilter, setEchelonFilter] = useState<BilletEchelon | "">("");
   const [mosFilter, setMosFilter] = useState("");
   const [timeFilter, setTimeFilter] = useState("");
+  const [unitFilter, setUnitFilter] = useState("");
 
   const people = collectCompanySoldiers(roster.unassigned);
-  const times = practiceTimeByUser(roster);
+  // Both walk the whole roster tree — memoized so retyping in the search box
+  // above (which re-renders this panel on every keystroke) doesn't redo them.
+  const times = useMemo(() => practiceTimeByUser(roster), [roster]);
+  const echelonMap = useMemo(() => computeEchelonMap(roster), [roster]);
   const mosOptions = [...new Set(people.map((p) => p.mos).filter((m) => m.trim() !== ""))].sort();
   const timeOptions = [...new Set(people.map((p) => times.get(p.userId)).filter((t): t is string => !!t))].sort();
+  // Where they served before landing in the pool — set when imported via
+  // +Import Trooper/+Import Company, or (for a split-output battalion) their
+  // former 2-7 posting captured at Commit Split. Most people never got
+  // flattened out of a prior structure, so this list is often short/empty.
+  const unitOptions = [...new Set(people.map(originCompanyLabel).filter((u): u is string => !!u))].sort();
 
   const query = search.trim().toLowerCase();
   const filtered = people.filter((p) => {
-    if (tierFilter && classifyTier(p) !== tierFilter) return false;
+    if (echelonFilter && (echelonMap.get(p.userId) ?? "squad") !== echelonFilter) return false;
     if (mosFilter && p.mos !== mosFilter) return false;
     if (timeFilter && times.get(p.userId) !== timeFilter) return false;
+    if (unitFilter && originCompanyLabel(p) !== unitFilter) return false;
     if (query && !p.realName.toLowerCase().includes(query) && !p.username.toLowerCase().includes(query)) {
       return false;
     }
@@ -625,11 +655,11 @@ function PoolPanel({ roster }: { roster: RosterData }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value as LeadershipTier | "")}>
-          <option value="">All tiers</option>
-          {TIER_ORDER.map((t) => (
-            <option key={t} value={t}>
-              {TIER_LABELS[t]}
+        <select value={echelonFilter} onChange={(e) => setEchelonFilter(e.target.value as BilletEchelon | "")}>
+          <option value="">All echelons</option>
+          {ECHELON_ORDER.map((e) => (
+            <option key={e} value={e}>
+              {ECHELON_LABELS[e]}
             </option>
           ))}
         </select>
@@ -651,6 +681,16 @@ function PoolPanel({ roster }: { roster: RosterData }) {
             ))}
           </select>
         )}
+        {unitOptions.length > 0 && (
+          <select value={unitFilter} onChange={(e) => setUnitFilter(e.target.value)}>
+            <option value="">Any former unit</option>
+            {unitOptions.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <DroppablePool>
         {filtered.map((soldier) => (
@@ -659,6 +699,7 @@ function PoolPanel({ roster }: { roster: RosterData }) {
             <span className="pool-meta">
               {soldier.mos || "—"}
               {times.get(soldier.userId) ? ` · ${times.get(soldier.userId)}` : ""}
+              {originCompanyLabel(soldier) ? ` · from ${originCompanyLabel(soldier)}` : ""}
             </span>
           </div>
         ))}
@@ -749,7 +790,11 @@ function DetailPanel({ roster, selected }: { roster: RosterData; selected: Selec
     const people = [
       ...(platoon.leader ? [platoon.leader] : []),
       ...(platoon.sergeant ? [platoon.sergeant] : []),
-      ...platoon.squads.flatMap((s) => [...(s.leader ? [s.leader] : []), ...s.members]),
+      ...platoon.squads.flatMap((s) => [
+        ...(s.leader ? [s.leader] : []),
+        ...(s.assistantLeader ? [s.assistantLeader] : []),
+        ...s.members,
+      ]),
     ];
     return (
       <div className="detail-panel">
@@ -775,7 +820,11 @@ function DetailPanel({ roster, selected }: { roster: RosterData; selected: Selec
 
   const squad = platoon.squads.find((s) => s.number === selected.squad);
   if (!squad) return null;
-  const people = [...(squad.leader ? [squad.leader] : []), ...squad.members];
+  const people = [
+    ...(squad.leader ? [squad.leader] : []),
+    ...(squad.assistantLeader ? [squad.assistantLeader] : []),
+    ...squad.members,
+  ];
   return (
     <div className="detail-panel">
       <h3>
@@ -783,6 +832,7 @@ function DetailPanel({ roster, selected }: { roster: RosterData; selected: Selec
       </h3>
       <ul className="detail-fill-list">
         <li className={squad.leader ? "stat-done" : ""}>SL: {squad.leader ? squad.leader.realName : "vacant"}</li>
+        {squad.assistantLeader && <li className="stat-done">ASL: {squad.assistantLeader.realName}</li>}
       </ul>
       <p className="detail-headcount">
         Headcount: {people.length}
@@ -863,16 +913,22 @@ export function DragDropTree({
 
   const activeCompany = roster.battalion.companies.find((c) => c.letter === activeLetter) ?? null;
 
-  const suggestions =
-    sourceRosterForSuggestions && suggestionStatus
-      ? suggestCompanies(sourceRosterForSuggestions, suggestionStatus, {
-          excludeCompanies:
-            sourceRosterForSuggestions.sendCharlieToHllv && suggestionStatus === INTACT_TRANSFER.status
-              ? [INTACT_TRANSFER.letter, sourceRosterForSuggestions.unassigned.letter]
-              : [],
-          usedLetters: roster.battalion.companies.map((c) => c.letter),
-        })
-      : { companies: [], warnings: [] };
+  // suggestCompanies clusters/bins the whole source roster and classifies
+  // leadership tiers — memoized so it doesn't re-run on every keystroke in
+  // the Pool search box or every drag-hover state change.
+  const suggestions = useMemo(
+    () =>
+      sourceRosterForSuggestions && suggestionStatus
+        ? suggestCompanies(sourceRosterForSuggestions, suggestionStatus, {
+            excludeCompanies:
+              sourceRosterForSuggestions.sendCharlieToHllv && suggestionStatus === INTACT_TRANSFER.status
+                ? [INTACT_TRANSFER.letter, sourceRosterForSuggestions.unassigned.letter]
+                : [],
+            usedLetters: roster.battalion.companies.map((c) => c.letter),
+          })
+        : { companies: [], warnings: [] },
+    [sourceRosterForSuggestions, suggestionStatus, roster.battalion.companies],
+  );
 
   function handleApplySuggestions() {
     const applied = applySuggestedCompanies(roster, suggestions.companies);

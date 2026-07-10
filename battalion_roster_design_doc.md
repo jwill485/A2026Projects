@@ -57,13 +57,17 @@ visible at a glance instead of requiring a trip to Analytics or the Split
 Planner, while leaving the drag-and-drop mechanic itself untouched.
 
 - **Pool (left)** — every trooper in the Unassigned company, always visible
-  (no need to point a pane at it), filterable by **tier** (Officer/Senior
-  NCO/Junior NCO/Trooper, via `classifyTier`), **MOS**, **practice time**
+  (no need to point a pane at it), filterable by **echelon** (Battalion HQ/
+  Company HQ/Platoon HQ/Squad — which level their *current* billet sits at,
+  via `computeEchelonMap`; mainly useful for spotting former company/platoon
+  staff carried over from a B/ACD import), **MOS**, **practice time**
   (inherited from whichever squad they were last in, via
-  `practiceTimeByUser`), and name/username search. It's a drop target too —
-  dragging someone here (a new `{ kind: "unassignedPool" }` `SlotPath`,
-  handled in `moveSoldier.ts` the same way `addSoldierToCompany`'s holding
-  squad works) sends them back to the pool from wherever they were.
+  `practiceTimeByUser`), **former unit** (from `Soldier.originLabel` — see
+  §3; shown inline per row too, e.g. "· from Baker (B)"), and name/username
+  search. It's a drop target too — dragging someone here (a new
+  `{ kind: "unassignedPool" }` `SlotPath`, handled in `moveSoldier.ts` the
+  same way `addSoldierToCompany`'s holding squad works) sends them back to
+  the pool from wherever they were.
 - **Structure (center)** — one active company at a time, picked from a
   **Building** dropdown (replacing the old Left/Right pane selectors).
   Every company/platoon/squad header carries a **leadership strip**
@@ -90,27 +94,50 @@ in whichever pane was "Building" — this was the consistency gap noted in
 vacant leadership-strip dot), and each squad's member list ends with a
 **+ assign trooper** affordance. Clicking opens a modal picker listing
 candidates filtered to the leadership tier the billet draws from (officers
-for CO/XO/PL, senior NCOs for SGM/1SG/PSG, junior NCOs for Squad Leader,
-everyone for members), rank-sorted with pool members first, each row
-showing MOS, current location, and squad practice time, with a search box
-and a **Show all ranks** escape hatch. One click places the person through
-the same `moveSoldier` path as a drag. Since only one company is visible at
-a time, this is also how a trooper moves **between two different
-companies** — pick them from wherever they currently sit rather than
-needing both companies' panes open simultaneously.
+for CO/XO/PL, senior NCOs for SGM/1SG/PSG, junior NCOs for Squad Leader/
+Assistant Squad Leader, everyone for members), rank-sorted with pool members
+first, each row showing MOS, current location, and squad practice time,
+with a search box and a **Show all ranks** escape hatch. One click places
+the person through the same `moveSoldier` path as a drag. Since only one
+company is visible at a time, this is also how a trooper moves **between
+two different companies** — pick them from wherever they currently sit
+rather than needing both companies' panes open simultaneously.
+
+Leadership tier itself (`leadership.ts`) is derived from each trooper's
+**current billet** (their position in the roster tree — Squad Leader,
+Platoon Sergeant, Company Commander, etc.), not their rank string. Rank
+alone can both over- and under-count real leadership (someone can hold a
+leadership-tier rank while sitting as a rank-and-file squad member, or vice
+versa), so tier and billet now agree by construction with the leadership
+fill-rate/vacancy analytics (§2.8), which were already billet-based. This is
+a separate axis from the Pool's **echelon** filter above (§2.3) — tier
+answers "is this person rank-appropriate for a vacancy," echelon answers
+"what level does their current billet sit at" — click-to-assign
+deliberately stayed on tier, since gating by echelon would mean a vacant
+Squad Leader billet defaults to showing "anyone currently at squad level"
+(i.e. every private) instead of rank-appropriate NCOs.
+
+Every squad also has an optional **Assistant Squad Leader** billet
+(`squad.assistantLeader`, junior-NCO tier — the live 7Cav data's "Assistant
+Section Leader"), with its own droppable slot and leadership-strip dot
+(**ASL**), alongside the Squad Leader (**SL**). Unlike Squad Leader, an
+empty Assistant Squad Leader doesn't count as a vacancy anywhere (fill-rate,
+vacancy report, "vacant leadership only" filter) — most squads don't have
+one filled, so treating it as required would flood those views with noise.
 
 A squad can also be dragged as a whole unit via its **⠿ Squad N** handle in
 the summary line, dropped onto any platoon's **squad-list drop zone** (a
 persistent "Drop a squad here" strip below that platoon's squads, since the
 gaps between existing squad cards are too thin to reliably target). Moves
-the leader and every member together; if the destination platoon already
-has a squad using that number, the incoming one is auto-renumbered (same
-next-available scheme as **+ Add Squad**) rather than colliding. **Known
-trade-off of the single-active-company layout:** whole-squad drag only
-reaches platoons within the *same* company, since a second company's squad
-list isn't rendered simultaneously — moving a whole squad to a *different*
-company isn't yet supported by any affordance (click-to-assign only moves
-one person at a time). Flagged as a fast-follow in §8.3.
+the leader, assistant leader, and every member together; if the destination
+platoon already has a squad using that number, the incoming one is
+auto-renumbered (same next-available scheme as **+ Add Squad**) rather than
+colliding. **Known trade-off of the single-active-company layout:**
+whole-squad drag only reaches platoons within the *same* company, since a
+second company's squad list isn't rendered simultaneously — moving a whole
+squad to a *different* company isn't yet supported by any affordance
+(click-to-assign only moves one person at a time). Flagged as a fast-follow
+in §8.3.
 
 When viewing a split-output roster (HLLV/HLLWW2) whose source roster is
 resolvable (see `RosterSummary.splitSourceId` in §3), the toolbar also shows
@@ -363,13 +390,22 @@ interface Soldier {
   rankFull: string;
   positionTitle: string; // raw 7Cav position title, if imported
   mos: string;
-  originLabel?: string;  // billet label at import time; unset if hand-created
+  // Billet label captured whenever someone lands somewhere new from outside
+  // the roster: at import (+Import Trooper/+Import Company), or their former
+  // 2-7 posting captured when Commit Split flattens them into HLLV/HLLWW2's
+  // pool. Unset if hand-created or never moved that way.
+  originLabel?: string;
   splitStatus?: "neutral" | "hllv" | "hllww2"; // battalion-split decision tag; unset = neutral
 }
 
 interface Squad {
   number: string;
   leader: Soldier | null;
+  // Assistant Section Leader in the live 7Cav data — a real, distinct
+  // billet (junior-NCO tier), not folded into members. Optional in
+  // practice; excluded from vacancy/fill-rate reporting since most squads
+  // don't have one filled.
+  assistantLeader: Soldier | null;
   members: Soldier[];
   practiceTime?: string; // free-text drill schedule; planning metadata like splitStatus
 }
@@ -681,6 +717,10 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
     leadership → platoon leadership → squads as explicit stages) if the
     current single-company-tree-plus-strips view still feels like too much
     at once once it's been used for a while.
+  - **Battalion HQ should be stageable too, not just companies.** Today
+    `Company.staged`/"Mark complete" only exists on individual companies;
+    `BattalionHQ` (CO/XO/SGM) has no equivalent lock/"complete" state once
+    the whole battalion's leadership is settled.
 - **Personnel query tab:** a separate tab for querying MILPACS profile data
   about troopers in 2-7 and B/ACD — graduations, disciplinary records,
   awards, secondary billets, ranks, and MOS. The full (non-lite) roster

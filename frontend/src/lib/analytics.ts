@@ -25,6 +25,7 @@ export function collectCompanySoldiers(company: Company): Soldier[] {
     if (platoon.sergeant) soldiers.push(platoon.sergeant);
     for (const squad of platoon.squads) {
       if (squad.leader) soldiers.push(squad.leader);
+      if (squad.assistantLeader) soldiers.push(squad.assistantLeader);
       soldiers.push(...squad.members);
     }
   }
@@ -57,9 +58,13 @@ export function computeMosBreakdown(people: Soldier[]): CountStat[] {
     .map(([label, value]) => ({ label, value }));
 }
 
-// MOS makeup of one squad (leader + members).
+// MOS makeup of one squad (leader + assistant leader + members).
 export function computeSquadMos(squad: Squad): CountStat[] {
-  return computeMosBreakdown([...(squad.leader ? [squad.leader] : []), ...squad.members]);
+  return computeMosBreakdown([
+    ...(squad.leader ? [squad.leader] : []),
+    ...(squad.assistantLeader ? [squad.assistantLeader] : []),
+    ...squad.members,
+  ]);
 }
 
 // Every trooper's practice time, inherited from whichever squad they're
@@ -73,6 +78,7 @@ export function practiceTimeByUser(roster: RosterData): Map<string, string> {
         const time = (squad.practiceTime ?? "").trim();
         if (time === "") continue;
         if (squad.leader) map.set(squad.leader.userId, time);
+        if (squad.assistantLeader) map.set(squad.assistantLeader.userId, time);
         for (const member of squad.members) map.set(member.userId, time);
       }
     }

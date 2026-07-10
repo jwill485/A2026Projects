@@ -1,7 +1,7 @@
 import type { Platoon, RosterData, Soldier, SplitStatus, Squad } from "../types/roster";
 import { makeCompany } from "./rosterFactory";
 import { removeSoldier } from "./moveSoldier";
-import { classifyTier } from "./leadership";
+import { computeTierMap } from "./leadership";
 import { computeMosBreakdown, type CountStat } from "./analytics";
 
 // Suggests a company/platoon/squad structure for one side of the split from
@@ -18,6 +18,7 @@ export interface SuggestedSquad {
   sourceLabel: string;
   practiceTime?: string;
   leader: Soldier | null;
+  assistantLeader: Soldier | null;
   members: Soldier[];
   mos: CountStat[];
 }
@@ -95,15 +96,22 @@ export function suggestCompanies(
     const companyLabel = company.letter === "UNASSIGNED" ? "Unassigned" : company.letter;
     for (const platoon of company.platoons) {
       for (const squad of platoon.squads) {
-        const everyone = [...(squad.leader ? [squad.leader] : []), ...squad.members];
+        const everyone = [
+          ...(squad.leader ? [squad.leader] : []),
+          ...(squad.assistantLeader ? [squad.assistantLeader] : []),
+          ...squad.members,
+        ];
         const tagged = everyone.filter((s) => s.splitStatus === status);
         if (tagged.length === 0) continue;
         const leader = squad.leader && squad.leader.splitStatus === status ? squad.leader : null;
+        const assistantLeader =
+          squad.assistantLeader && squad.assistantLeader.splitStatus === status ? squad.assistantLeader : null;
         units.push({
           sourceLabel: `${companyLabel}/${platoon.number}/${squad.number}`,
           practiceTime: (squad.practiceTime ?? "").trim() || undefined,
           leader,
-          members: tagged.filter((s) => s.userId !== leader?.userId),
+          assistantLeader,
+          members: tagged.filter((s) => s.userId !== leader?.userId && s.userId !== assistantLeader?.userId),
           mos: computeMosBreakdown(tagged),
         });
       }
@@ -113,9 +121,10 @@ export function suggestCompanies(
 
   const warnings: string[] = [];
   const everyoneTagged = units.flatMap((u) => [...(u.leader ? [u.leader] : []), ...u.members]);
-  const officerCount = everyoneTagged.filter((s) => classifyTier(s) === "officer").length;
-  const seniorNcoCount = everyoneTagged.filter((s) => classifyTier(s) === "seniorNco").length;
-  const juniorNcoCount = everyoneTagged.filter((s) => classifyTier(s) === "juniorNco").length;
+  const tierMap = computeTierMap(source);
+  const officerCount = everyoneTagged.filter((s) => tierMap.get(s.userId) === "officer").length;
+  const seniorNcoCount = everyoneTagged.filter((s) => tierMap.get(s.userId) === "seniorNco").length;
+  const juniorNcoCount = everyoneTagged.filter((s) => tierMap.get(s.userId) === "juniorNco").length;
 
   // Company count is driven by squad availability and the battalion's own
   // cap — NOT by leadership. Leadership (especially senior NCO — cavalry-wide
@@ -182,7 +191,10 @@ export function suggestCompanies(
       name: COMPANY_NAMES[letter] ?? letter,
       practiceTimes,
       platoons,
-      headcount: squads.reduce((sum, s) => sum + (s.leader ? 1 : 0) + s.members.length, 0),
+      headcount: squads.reduce(
+        (sum, s) => sum + (s.leader ? 1 : 0) + (s.assistantLeader ? 1 : 0) + s.members.length,
+        0,
+      ),
     };
   });
 
@@ -239,19 +251,22 @@ export function applySuggestedCompanies(
         const squad: Squad = {
           number: String(squadNumber),
           leader: null,
+          assistantLeader: null,
           members: [],
           practiceTime: suggestedSquad.practiceTime,
         };
         for (const person of [
           ...(suggestedSquad.leader ? [suggestedSquad.leader] : []),
+          ...(suggestedSquad.assistantLeader ? [suggestedSquad.assistantLeader] : []),
           ...suggestedSquad.members,
         ]) {
           const pulled = removeSoldier(clone, person.userId);
           if (!pulled) continue;
           if (suggestedSquad.leader?.userId === person.userId) squad.leader = pulled;
+          else if (suggestedSquad.assistantLeader?.userId === person.userId) squad.assistantLeader = pulled;
           else squad.members.push(pulled);
         }
-        if (squad.leader || squad.members.length > 0) {
+        if (squad.leader || squad.assistantLeader || squad.members.length > 0) {
           platoon.squads.push(squad);
           squadNumber += 1;
         }

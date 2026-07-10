@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { RosterData, Soldier } from "../types/roster";
 import type { ApiRankExpanded } from "../types/api";
 import type { SlotPath } from "../lib/moveSoldier";
 import { collectAllSoldiers, collectCompanySoldiers, practiceTimeByUser } from "../lib/analytics";
 import { describeSoldierLocations } from "../lib/changelog";
-import { classifyTier, TIER_LABELS, type LeadershipTier } from "../lib/leadership";
+import { tierMapFromLocations, TIER_LABELS, type LeadershipTier } from "../lib/leadership";
 import "./SoldierForm.css";
 import "./CandidatePicker.css";
 
@@ -26,6 +26,7 @@ const SLOT_TIERS: Record<SlotPath["kind"], LeadershipTier[] | null> = {
   platoonLeader: ["officer"],
   platoonSergeant: ["seniorNco"],
   squadLeader: ["juniorNco"],
+  squadAssistantLeader: ["juniorNco"],
   squadMember: null,
   unassignedPool: null,
 };
@@ -50,6 +51,8 @@ export function describeSlot(destination: SlotPath): string {
       return `${destination.company} / Platoon ${destination.platoon} — Platoon Sergeant`;
     case "squadLeader":
       return `${destination.company} / Plt ${destination.platoon} / Sqd ${destination.squad} — Squad Leader`;
+    case "squadAssistantLeader":
+      return `${destination.company} / Plt ${destination.platoon} / Sqd ${destination.squad} — Assistant Squad Leader`;
     case "squadMember":
       return `${destination.company} / Plt ${destination.platoon} / Sqd ${destination.squad} — Member`;
     case "unassignedPool":
@@ -75,13 +78,17 @@ export function CandidatePicker({
 
   const tiers = SLOT_TIERS[destination.kind];
   const rankOrder = new Map(ranks.map((r) => [r.rankId, r.rankDisplayOrder]));
-  const locations = describeSoldierLocations(roster);
-  const practiceTimes = practiceTimeByUser(roster);
+  // One tree walk shared for both locations and tiers (tierMapFromLocations
+  // avoids a second walk) — memoized on roster so retyping in the search
+  // box, which re-renders this modal on every keystroke, doesn't redo it.
+  const locations = useMemo(() => describeSoldierLocations(roster), [roster]);
+  const tierMap = useMemo(() => tierMapFromLocations(locations), [locations]);
+  const practiceTimes = useMemo(() => practiceTimeByUser(roster), [roster]);
   const poolIds = new Set(collectCompanySoldiers(roster.unassigned).map((s) => s.userId));
 
   const query = search.trim().toLowerCase();
   const candidates = collectAllSoldiers(roster)
-    .filter((s) => showAll || tiers === null || tiers.includes(classifyTier(s)))
+    .filter((s) => showAll || tiers === null || tiers.includes(tierMap.get(s.userId) ?? "trooper"))
     .filter(
       (s) =>
         query === "" ||

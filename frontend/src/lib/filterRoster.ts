@@ -47,7 +47,14 @@ function slotMatches(soldier: Soldier | null, filter: RosterFilter): boolean {
 }
 
 export function squadHasMatch(squad: Squad, filter: RosterFilter): boolean {
-  return slotMatches(squad.leader, filter) || squad.members.some((m) => matchesSoldier(m, filter));
+  // Assistant Squad Leader is an optional billet most squads don't have
+  // filled — unlike Squad Leader, an empty one doesn't count toward
+  // "vacant leadership only" (that would flag nearly every squad).
+  return (
+    slotMatches(squad.leader, filter) ||
+    (squad.assistantLeader ? matchesSoldier(squad.assistantLeader, filter) : false) ||
+    squad.members.some((m) => matchesSoldier(m, filter))
+  );
 }
 
 export function platoonHasMatch(platoon: Platoon, filter: RosterFilter): boolean {

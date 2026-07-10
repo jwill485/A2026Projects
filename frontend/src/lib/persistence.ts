@@ -48,6 +48,27 @@ function loadJson<T>(key: string): T | null {
   }
 }
 
+// Squad.assistantLeader was added after rosters were already being saved to
+// localStorage — older saved data simply won't have the key, parsing as
+// `undefined` rather than `null`. Backfill it so the rest of the app can
+// keep treating the field as always-present (like Squad.leader), not as
+// optional.
+function normalizeRoster(roster: RosterData): RosterData {
+  for (const company of [...roster.battalion.companies, roster.unassigned]) {
+    for (const platoon of company.platoons) {
+      for (const squad of platoon.squads) {
+        if (squad.assistantLeader === undefined) squad.assistantLeader = null;
+      }
+    }
+  }
+  return roster;
+}
+
+function loadRosterJson(key: string): RosterData | null {
+  const roster = loadJson<RosterData>(key);
+  return roster ? normalizeRoster(roster) : null;
+}
+
 export function listRosters(): RosterSummary[] {
   return loadJson<RosterSummary[]>(INDEX_KEY) ?? [];
 }
@@ -65,7 +86,7 @@ export function setActiveRosterId(id: string): void {
 }
 
 export function loadRoster(id: string): RosterData | null {
-  return loadJson<RosterData>(rosterKey(id));
+  return loadRosterJson(rosterKey(id));
 }
 
 export function saveRoster(id: string, roster: RosterData): void {
@@ -73,7 +94,7 @@ export function saveRoster(id: string, roster: RosterData): void {
 }
 
 export function loadBaseline(id: string): RosterData | null {
-  return loadJson<RosterData>(baselineKey(id));
+  return loadRosterJson(baselineKey(id));
 }
 
 export function saveBaseline(id: string, roster: RosterData): void {
@@ -163,9 +184,9 @@ export function deleteRoster(id: string): void {
  */
 export function migrateLegacyStorage(): void {
   if (listRosters().length > 0) return;
-  const legacyRoster = loadJson<RosterData>(LEGACY_ROSTER_KEY);
+  const legacyRoster = loadRosterJson(LEGACY_ROSTER_KEY);
   if (!legacyRoster) return;
-  const legacyBaseline = loadJson<RosterData>(LEGACY_BASELINE_KEY) ?? legacyRoster;
+  const legacyBaseline = loadRosterJson(LEGACY_BASELINE_KEY) ?? legacyRoster;
   const legacyChangeLog = loadJson<ChangeLogEntry[]>(LEGACY_CHANGELOG_KEY) ?? [];
   const id = createRoster("2-7 Cavalry Battalion", legacyRoster, legacyBaseline);
   saveChangeLog(id, legacyChangeLog);

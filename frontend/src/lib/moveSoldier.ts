@@ -12,6 +12,7 @@ export type SlotPath =
   | { kind: "platoonLeader"; company: string; platoon: string }
   | { kind: "platoonSergeant"; company: string; platoon: string }
   | { kind: "squadLeader"; company: string; platoon: string; squad: string }
+  | { kind: "squadAssistantLeader"; company: string; platoon: string; squad: string }
   | { kind: "squadMember"; company: string; platoon: string; squad: string }
   // Drop target for the Drag & Drop Pool panel: puts someone back in the
   // Unassigned pool's holding squad, same convention as addSoldierToCompany.
@@ -71,6 +72,12 @@ export function isSlotOccupied(roster: RosterData, destination: SlotPath): boole
       const squad = platoon && findSquad(platoon, destination.squad);
       return squad?.leader != null;
     }
+    case "squadAssistantLeader": {
+      const company = findCompany(roster, destination.company);
+      const platoon = company && findPlatoon(company, destination.platoon);
+      const squad = platoon && findSquad(platoon, destination.squad);
+      return squad?.assistantLeader != null;
+    }
     case "squadMember":
       return false;
     case "unassignedPool":
@@ -109,6 +116,11 @@ function removeFromCompany(company: Company, userId: string): Soldier | null {
       if (squad.leader?.userId === userId) {
         const soldier = squad.leader;
         squad.leader = null;
+        return soldier;
+      }
+      if (squad.assistantLeader?.userId === userId) {
+        const soldier = squad.assistantLeader;
+        squad.assistantLeader = null;
         return soldier;
       }
       const index = squad.members.findIndex((m) => m.userId === userId);
@@ -194,6 +206,14 @@ function placeSoldier(roster: RosterData, soldier: Soldier, destination: SlotPat
       squad.leader = soldier;
       return true;
     }
+    case "squadAssistantLeader": {
+      const company = findCompany(roster, destination.company);
+      const platoon = company && findPlatoon(company, destination.platoon);
+      const squad = platoon && findSquad(platoon, destination.squad);
+      if (!squad) return false;
+      squad.assistantLeader = soldier;
+      return true;
+    }
     case "squadMember": {
       const company = findCompany(roster, destination.company);
       const platoon = company && findPlatoon(company, destination.platoon);
@@ -211,7 +231,7 @@ function placeSoldier(roster: RosterData, soldier: Soldier, destination: SlotPat
       }
       let squad = platoon.squads.find((s) => s.number === "0");
       if (!squad) {
-        squad = { number: "0", leader: null, members: [] };
+        squad = { number: "0", leader: null, assistantLeader: null, members: [] };
         platoon.squads.unshift(squad);
       }
       squad.members.push(soldier);
@@ -255,12 +275,16 @@ export function addSquad(roster: RosterData, companyLetter: string, platoonNumbe
   const nextNumber = String(
     platoon.squads.reduce((max, s) => Math.max(max, Number(s.number)), 0) + 1,
   );
-  platoon.squads.push({ number: nextNumber, leader: null, members: [] });
+  platoon.squads.push({ number: nextNumber, leader: null, assistantLeader: null, members: [] });
   return clone;
 }
 
-function isSquadEmpty(squad: { leader: Soldier | null; members: Soldier[] }): boolean {
-  return !squad.leader && squad.members.length === 0;
+function isSquadEmpty(squad: {
+  leader: Soldier | null;
+  assistantLeader: Soldier | null;
+  members: Soldier[];
+}): boolean {
+  return !squad.leader && !squad.assistantLeader && squad.members.length === 0;
 }
 
 export function deleteSquad(
@@ -361,7 +385,7 @@ export function addSoldierToCompany(roster: RosterData, letter: string, soldier:
   }
   let squad = platoon.squads.find((s) => s.number === "0");
   if (!squad) {
-    squad = { number: "0", leader: null, members: [] };
+    squad = { number: "0", leader: null, assistantLeader: null, members: [] };
     platoon.squads.unshift(squad);
   }
   squad.members.push(soldier);
@@ -405,6 +429,8 @@ function pruneDuplicates(company: Company, existingIds: Set<string>): void {
     if (platoon.sergeant && existingIds.has(platoon.sergeant.userId)) platoon.sergeant = null;
     for (const squad of platoon.squads) {
       if (squad.leader && existingIds.has(squad.leader.userId)) squad.leader = null;
+      if (squad.assistantLeader && existingIds.has(squad.assistantLeader.userId))
+        squad.assistantLeader = null;
       squad.members = squad.members.filter((m) => !existingIds.has(m.userId));
     }
   }
@@ -414,7 +440,7 @@ function isPlatoonEmpty(platoon: Platoon): boolean {
   return (
     !platoon.leader &&
     !platoon.sergeant &&
-    platoon.squads.every((s) => !s.leader && s.members.length === 0)
+    platoon.squads.every((s) => !s.leader && !s.assistantLeader && s.members.length === 0)
   );
 }
 
@@ -489,6 +515,10 @@ function updateInCompany(
     for (const squad of platoon.squads) {
       if (squad.leader?.userId === userId) {
         squad.leader = { ...squad.leader, ...patch };
+        return true;
+      }
+      if (squad.assistantLeader?.userId === userId) {
+        squad.assistantLeader = { ...squad.assistantLeader, ...patch };
         return true;
       }
       const index = squad.members.findIndex((m) => m.userId === userId);

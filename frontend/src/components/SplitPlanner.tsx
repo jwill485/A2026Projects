@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import type { RosterData, Soldier, Squad } from "../types/roster";
+import { useMemo, useRef, useState } from "react";
+import type { RosterData, Soldier, SplitStatus, Squad } from "../types/roster";
 import type { RosterSummary } from "../lib/persistence";
 import type { SquadLocation } from "../lib/moveSoldier";
 import {
@@ -22,8 +22,11 @@ function PhaseChip({ state }: { state: PhaseState }) {
   return <span className={`phase-chip phase-chip-${state}`}>{label}</span>;
 }
 
-function TierList({ soldiers }: { soldiers: Soldier[] }) {
-  const buckets = bucketByTier(soldiers);
+function TierList({ roster, soldiers }: { roster: RosterData; soldiers: Soldier[] }) {
+  // bucketByTier walks the whole roster tree — memoized so it only re-runs
+  // when this group's tagged membership or the roster itself changes, not
+  // on every unrelated re-render (e.g. typing in a search box elsewhere).
+  const buckets = useMemo(() => bucketByTier(roster, soldiers), [roster, soldiers]);
   return (
     <div className="tier-list">
       {TIER_ORDER.map((tier) => (
@@ -149,12 +152,16 @@ export function SplitPlanner({
     });
   }
 
-  const everyone = collectAllSoldiers(roster);
-  const groups = SPLIT_GROUPS.map((g) => ({
-    ...g,
-    members: everyone.filter((s) => s.splitStatus === g.status),
-    summary: rosterList.find((r) => r.name === g.name),
-  }));
+  const everyone = useMemo(() => collectAllSoldiers(roster), [roster]);
+  const groups = useMemo(
+    () =>
+      SPLIT_GROUPS.map((g) => ({
+        ...g,
+        members: everyone.filter((s) => s.splitStatus === g.status),
+        summary: rosterList.find((r) => r.name === g.name),
+      })),
+    [everyone, rosterList],
+  );
   const taggedCount = groups.reduce((sum, g) => sum + g.members.length, 0);
   const neutralCount = everyone.length - taggedCount;
 
@@ -166,25 +173,58 @@ export function SplitPlanner({
       ? "active"
       : "todo";
 
-  const builds = groups
-    .filter((g) => g.summary)
-    .map((g) => {
-      const data = loadRosterData(g.summary!.id);
-      if (!data) return { ...g, data: null, hqFilled: 0, companies: 0, leadFilled: 0, leadTotal: 0, poolLeft: 0 };
-      const hqFilled = [data.battalion.commander, data.battalion.executiveOfficer, data.battalion.sergeantMajor]
-        .filter(Boolean).length;
-      const fill = computeLeadershipFillByCompany(data);
-      const leadFilled = fill.reduce((sum, f) => sum + f.filled, 0);
-      const leadTotal = fill.reduce((sum, f) => sum + f.filled + f.vacant, 0);
-      const poolLeft = collectCompanySoldiers(data.unassigned).length;
-      return { ...g, data, hqFilled, companies: data.battalion.companies.length, leadFilled, leadTotal, poolLeft };
-    });
+  // Reads+parses HLLV/HLLWW2 from localStorage — memoized so it only re-runs
+  // when this roster's groups/tags or the roster list actually change
+  // (switching the active roster or an explicit save both change one of
+  // those), not on every unrelated re-render.
+  const builds = useMemo(
+    () =>
+      groups
+        .filter((g) => g.summary)
+        .map((g) => {
+          const data = loadRosterData(g.summary!.id);
+          if (!data) return { ...g, data: null, hqFilled: 0, companies: 0, leadFilled: 0, leadTotal: 0, poolLeft: 0 };
+          const hqFilled = [data.battalion.commander, data.battalion.executiveOfficer, data.battalion.sergeantMajor]
+            .filter(Boolean).length;
+          const fill = computeLeadershipFillByCompany(data);
+          const leadFilled = fill.reduce((sum, f) => sum + f.filled, 0);
+          const leadTotal = fill.reduce((sum, f) => sum + f.filled + f.vacant, 0);
+          const poolLeft = collectCompanySoldiers(data.unassigned).length;
+          return { ...g, data, hqFilled, companies: data.battalion.companies.length, leadFilled, leadTotal, poolLeft };
+        }),
+    [groups, loadRosterData],
+  );
   const buildState: PhaseState =
     builds.length === 0
       ? "todo"
       : builds.every((b) => b.hqFilled === 3 && b.companies > 0 && b.poolLeft === 0)
         ? "done"
         : "active";
+
+  // suggestCompanies clusters/bins the whole source roster by practice time
+  // and classifies leadership tiers — heavy enough to be worth hoisting out
+  // of the JSX .map() below and memoizing, since this ran fresh on every
+  // render for both battalions otherwise.
+  const buildSuggestions = useMemo(() => {
+    const map = new Map<SplitStatus, { companies: SuggestedCompany[]; warnings: string[] }>();
+    for (const b of builds) {
+      // Suggestions come from the SOURCE roster's tags + practice times, so
+      // they're only meaningful when planning from it.
+      map.set(
+        b.status,
+        b.data && activeConfiguration !== "new"
+          ? suggestCompanies(roster, b.status, {
+              excludeCompanies:
+                roster.sendCharlieToHllv && b.status === INTACT_TRANSFER.status
+                  ? [INTACT_TRANSFER.letter, roster.unassigned.letter]
+                  : [],
+              usedLetters: b.data.battalion.companies.map((c) => c.letter),
+            })
+          : { companies: [], warnings: [] },
+      );
+    }
+    return map;
+  }, [builds, roster, activeConfiguration]);
 
   // B/ACD (the Unassigned pool) practices too — findCompany resolves its
   // "UNASSIGNED" letter the same as any company, so its squads join in.
@@ -411,7 +451,7 @@ export function SplitPlanner({
                 {g.name} <span className="group-headcount">{g.members.length} tagged</span>
               </h4>
               {g.members.length > 0 ? (
-                <TierList soldiers={g.members} />
+                <TierList roster={roster} soldiers={g.members} />
               ) : (
                 <p className="tier-empty">Nobody tagged for {g.name} yet.</p>
               )}
@@ -472,18 +512,10 @@ export function SplitPlanner({
         ) : (
           <div className="group-grid">
             {builds.map((b) => {
-              // Suggestions come from the SOURCE roster's tags + practice
-              // times, so they're only meaningful when planning from it.
-              const { companies: suggestions, warnings: suggestionWarnings } =
-                b.data && activeConfiguration !== "new"
-                  ? suggestCompanies(roster, b.status, {
-                      excludeCompanies:
-                        roster.sendCharlieToHllv && b.status === INTACT_TRANSFER.status
-                          ? [INTACT_TRANSFER.letter, roster.unassigned.letter]
-                          : [],
-                      usedLetters: b.data.battalion.companies.map((c) => c.letter),
-                    })
-                  : { companies: [], warnings: [] };
+              const { companies: suggestions, warnings: suggestionWarnings } = buildSuggestions.get(b.status) ?? {
+                companies: [],
+                warnings: [],
+              };
               return (
                 <div key={b.status} className={`group-card group-${b.status}`}>
                   <h4>{b.name}</h4>

@@ -46,7 +46,7 @@ function getPlatoon(company: Company, number: string): Platoon {
 function getSquad(platoon: Platoon, number: string): Squad {
   let squad = platoon.squads.find((s) => s.number === number);
   if (!squad) {
-    squad = { number, leader: null, members: [] };
+    squad = { number, leader: null, assistantLeader: null, members: [] };
     platoon.squads.push(squad);
   }
   return squad;
@@ -127,6 +127,7 @@ export function buildRosterData(
       const platoon = getPlatoon(company, platoonNumber);
       const squad = getSquad(platoon, squadNumber);
       if (role === "Section Leader") squad.leader = soldier;
+      else if (role === "Assistant Section Leader") squad.assistantLeader = soldier;
       else squad.members.push(soldier);
       continue;
     }

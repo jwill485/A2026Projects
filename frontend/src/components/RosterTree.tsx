@@ -56,7 +56,16 @@ function SquadNode({
       <summary>
         Squad {squad.number} — Leader:{" "}
         <SoldierName soldier={squad.leader} filter={filter} onSetSplitStatus={onSetSplitStatus} />
-        <span className="count-badge">{squad.members.length + (squad.leader ? 1 : 0)}</span>
+        {squad.assistantLeader && (
+          <>
+            {" "}
+            | Asst:{" "}
+            <SoldierName soldier={squad.assistantLeader} filter={filter} onSetSplitStatus={onSetSplitStatus} />
+          </>
+        )}
+        <span className="count-badge">
+          {squad.members.length + (squad.leader ? 1 : 0) + (squad.assistantLeader ? 1 : 0)}
+        </span>
       </summary>
       <ul className="member-list">
         {squad.members.map((member) => (
@@ -80,7 +89,7 @@ function PlatoonNode({
   onSetSplitStatus?: SetSplitStatus;
 }) {
   const total = platoon.squads.reduce(
-    (sum, s) => sum + s.members.length + (s.leader ? 1 : 0),
+    (sum, s) => sum + s.members.length + (s.leader ? 1 : 0) + (s.assistantLeader ? 1 : 0),
     0,
   );
   const squads = isFilterActive(filter)
@@ -115,7 +124,11 @@ function CompanyNode({
 }) {
   const total = company.platoons.reduce(
     (sum, p) =>
-      sum + p.squads.reduce((s2, sq) => s2 + sq.members.length + (sq.leader ? 1 : 0), 0),
+      sum +
+      p.squads.reduce(
+        (s2, sq) => s2 + sq.members.length + (sq.leader ? 1 : 0) + (sq.assistantLeader ? 1 : 0),
+        0,
+      ),
     0,
   );
   const platoons = isFilterActive(filter)

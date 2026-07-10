@@ -21,8 +21,7 @@ cd "C:\Users\cskat\OneDrive\Desktop\7Cav\RosterManager\backend"
 .venv\Scripts\activate
 uvicorn app.main:app --reload --port 8000
 ```
-You'll know it worked when you see a line like `Uvicorn running on
-http://127.0.0.1:8000`. Leave this window open.
+
 
 **Terminal 2 — frontend**
 
@@ -31,9 +30,7 @@ Open a **second** terminal (don't reuse the first one) and run:
 cd "C:\Users\cskat\OneDrive\Desktop\7Cav\RosterManager\frontend"
 npm run dev
 ```
-You'll know it worked when it prints a `Local:` URL — usually
-`http://localhost:5173`. Open that link in your browser. Leave this window
-open too.
+
 
 **When you're done for the session**, just close both terminal windows (or
 press `Ctrl+C` in each, then close them) — that's the same as the servers

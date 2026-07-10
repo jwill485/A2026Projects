@@ -20,6 +20,11 @@ export interface Soldier {
 export interface Squad {
   number: string;
   leader: Soldier | null;
+  // Assistant Section Leader in the live 7Cav data — a real, distinct
+  // billet, not just another member. Optional in practice: most squads
+  // don't have one filled, so it's excluded from vacancy/fill-rate
+  // reporting (see analytics.ts) to avoid flooding those with noise.
+  assistantLeader: Soldier | null;
   members: Soldier[];
   // Free-text practice/drill schedule (e.g. "Tue 1900 EST"), entered on the
   // Split Planner's practice-times phase. Like splitStatus, it's planning

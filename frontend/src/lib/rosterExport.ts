@@ -1,10 +1,14 @@
 import type { Battalion, Company, Platoon, Soldier, Squad } from "../types/roster";
-import { classifyTier } from "./leadership";
+import type { LeadershipTier } from "./leadership";
 
 // Scope filter for the printable roster list (§2.11): narrow the list to
 // leadership tiers. Units that end up with nobody matching are pruned
 // entirely, so a filtered print reads as "these people, organized by unit"
 // rather than a full structure riddled with gaps.
+//
+// Tier here is the billet each helper already knows it's looking at (e.g.
+// filterSquad knows squad.leader is a Squad Leader), not the soldier's
+// rank — see leadership.ts.
 
 export type ListScope = "everyone" | "leadership" | "officers" | "ncos";
 
@@ -15,29 +19,33 @@ export const SCOPE_OPTIONS: { value: ListScope; label: string }[] = [
   { value: "ncos", label: "NCOs only" },
 ];
 
-function matchesScope(soldier: Soldier, scope: ListScope): boolean {
+function matchesScope(tier: LeadershipTier, scope: ListScope): boolean {
   if (scope === "everyone") return true;
-  const tier = classifyTier(soldier);
   if (scope === "leadership") return tier !== "trooper";
   if (scope === "officers") return tier === "officer";
   return tier === "seniorNco" || tier === "juniorNco";
 }
 
-export function keepInScope(soldier: Soldier | null, scope: ListScope): Soldier | null {
-  return soldier && matchesScope(soldier, scope) ? soldier : null;
+export function keepInScope(
+  soldier: Soldier | null,
+  tier: LeadershipTier,
+  scope: ListScope,
+): Soldier | null {
+  return soldier && matchesScope(tier, scope) ? soldier : null;
 }
 const keep = keepInScope;
 
 function filterSquad(squad: Squad, scope: ListScope): Squad | null {
-  const leader = keep(squad.leader, scope);
-  const members = squad.members.filter((m) => matchesScope(m, scope));
-  if (!leader && members.length === 0) return null;
-  return { ...squad, leader, members };
+  const leader = keep(squad.leader, "juniorNco", scope);
+  const assistantLeader = keep(squad.assistantLeader, "juniorNco", scope);
+  const members = matchesScope("trooper", scope) ? squad.members : [];
+  if (!leader && !assistantLeader && members.length === 0) return null;
+  return { ...squad, leader, assistantLeader, members };
 }
 
 function filterPlatoon(platoon: Platoon, scope: ListScope): Platoon | null {
-  const leader = keep(platoon.leader, scope);
-  const sergeant = keep(platoon.sergeant, scope);
+  const leader = keep(platoon.leader, "officer", scope);
+  const sergeant = keep(platoon.sergeant, "seniorNco", scope);
   const squads = platoon.squads
     .map((s) => filterSquad(s, scope))
     .filter((s): s is Squad => s !== null);
@@ -47,9 +55,9 @@ function filterPlatoon(platoon: Platoon, scope: ListScope): Platoon | null {
 
 export function filterCompanyForScope(company: Company, scope: ListScope): Company | null {
   if (scope === "everyone") return company;
-  const commander = keep(company.commander, scope);
-  const executiveOfficer = keep(company.executiveOfficer, scope);
-  const firstSergeant = keep(company.firstSergeant, scope);
+  const commander = keep(company.commander, "officer", scope);
+  const executiveOfficer = keep(company.executiveOfficer, "officer", scope);
+  const firstSergeant = keep(company.firstSergeant, "seniorNco", scope);
   const platoons = company.platoons
     .map((p) => filterPlatoon(p, scope))
     .filter((p): p is Platoon => p !== null);
@@ -105,6 +113,7 @@ function companyRows(company: Company): ExportRow[] {
     for (const squad of platoon.squads) {
       const squadUnit = { ...unit, squad: squad.number };
       rows.push(...row(squad.leader, squadUnit, "Squad Leader"));
+      rows.push(...row(squad.assistantLeader, squadUnit, "Assistant Squad Leader"));
       for (const member of squad.members) rows.push(...row(member, squadUnit, "Member"));
     }
   }
