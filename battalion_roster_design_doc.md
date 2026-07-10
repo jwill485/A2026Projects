@@ -125,6 +125,16 @@ empty Assistant Squad Leader doesn't count as a vacancy anywhere (fill-rate,
 vacancy report, "vacant leadership only" filter) — most squads don't have
 one filled, so treating it as required would flood those views with noise.
 
+**Battalion HQ can be staged too**, the same "Mark complete" concept
+companies already had (`Battalion.staged`, independent of any individual
+company's staged state) — a **✅ Mark complete**/**🔓 Un-stage** button next
+to Battalion HQ's own leadership strip locks its CO/XO/SGM slots against
+reassignment (drops, click-to-assign) until un-staged. `DroppableSlot`
+takes an optional `lockedOverride` for this, since the shared per-company
+`locked` context value would otherwise be the wrong signal for Battalion
+HQ's own slots (it's scoped to whichever company Structure currently has
+active).
+
 A squad can also be dragged as a whole unit via its **⠿ Squad N** handle in
 the summary line, dropped onto any platoon's **squad-list drop zone** (a
 persistent "Drop a squad here" strip below that platoon's squads, since the
@@ -232,19 +242,21 @@ stays usable throughout:
    not-found / ambiguous / unreadable lines. A **🎲 Random tags (test)**
    button (confirm-gated, since it overwrites every tag) coin-flips
    everyone onto HLLV or HLLWW2 — a test helper for exercising the later
-   phases without doing the real sort first. A **Send Charlie Company
-   (C/2-7) to HLLV intact** checkbox (`RosterData.sendCharlieToHllv`,
-   `INTACT_TRANSFER` in `splitReorg.ts`) short-circuits sorting for that
-   company: checking it tags all of C's members **and the B/ACD pool's**
-   HLLV immediately (B/ACD is currently the real home of Charlie's people
-   while the live Charlie shell is empty, so it's treated as stored under
-   C/2-7 for this transfer). On commit, `buildSplitRoster` folds B/ACD's
-   platoons in under Charlie's own (renumbered past Charlie's own platoon
-   numbers, same next-available scheme as `+ Add Platoon`) and carries the
-   merged company — structure, leadership, practice times — into HLLV's
-   battalion as one unit, both groups bypassing every pool entirely
-   (regardless of any individual re-tags). The toggles (and these
-   buttons) are hidden entirely on rosters tagged **New** — tagging only
+   phases without doing the real sort first. A per-company **intact
+   transfer** selector (`RosterData.intactTransfers`, an
+   `{ letter, status }[]` — see `splitReorg.ts`) short-circuits sorting for
+   any company: picking a destination battalion for it tags all its members
+   that battalion's status immediately. On commit, `buildSplitRoster` carries
+   the whole company — structure, leadership, practice times — into that
+   battalion as one unit, bypassing its pool entirely (regardless of any
+   individual re-tags). **Charlie (C/2-7) specifically** also pulls the
+   **B/ACD pool** along with it, folded in as extra platoons (renumbered past
+   Charlie's own, same next-available scheme as `+ Add Platoon`) — B/ACD is
+   currently the real home of Charlie's people while the live Charlie shell
+   is empty, so it's treated as stored under C/2-7 for this transfer. That
+   fold-in is a Charlie-specific data fact, not a generalizable pattern — no
+   other company has an equivalent stand-in. The toggles (and these
+   selectors) are hidden entirely on rosters tagged **New** — tagging only
    means something on the source roster.
 2. **Practice times** — asks one question: accept the current practice
    times, or edit them first? **Accept** fills every blank squad with the
@@ -306,9 +318,13 @@ stays usable throughout:
    with a floor of 1. Practice-time clusters are bin-packed (largest
    first, into whichever company currently has the fewest squads) so
    squads that train together stay together whenever the company count
-   allows it, rather than one company per distinct time slot. Platoon
-   count per company targets ~3 squads/platoon without dropping below the
-   minimum. When squads or leadership fall short of a clean fit — too few
+   allows it, rather than one company per distinct time slot. Platoon count
+   per company targets ~3 squads/platoon without dropping below the
+   minimum; *within* a company, squads are then distributed across its
+   platoons to keep each dominant MOS roughly balanced (e.g. medics spread
+   across platoons rather than stacked in one) via a greedy round-robin —
+   `distributeSquadsForMosBalance` — rather than a blind sequential slice,
+   still never splitting a squad. When squads or leadership fall short of a clean fit — too few
    squads for even one company, leadership capping company count below
    what squads could otherwise support, or fewer junior NCOs than squads
    needing a leader — a warning explains what's short rather than silently
@@ -426,6 +442,7 @@ interface Company {
   executiveOfficer: Soldier | null;
   firstSergeant: Soldier | null;
   platoons: Platoon[];
+  staged?: boolean; // "Mark complete" in Drag & Drop; locks structural changes until un-staged
 }
 
 interface Battalion {
@@ -434,6 +451,13 @@ interface Battalion {
   executiveOfficer: Soldier | null;
   sergeantMajor: Soldier | null;
   companies: Company[];
+  staged?: boolean; // same "Mark complete" concept, one level up — locks Battalion HQ (CO/XO/SGM)
+}
+
+// One company sent to a battalion as an intact unit on Commit Split.
+interface IntactTransfer {
+  letter: string;
+  status: "neutral" | "hllv" | "hllww2"; // only "hllv"/"hllww2" are meaningful destinations
 }
 
 interface RosterData {
@@ -441,7 +465,7 @@ interface RosterData {
   unassigned: Company;   // the B/ACD-style holding pool; every roster has exactly one
   practiceTimesConfirmed?: boolean; // §2.9 phase 2 sign-off; gates Commit Split
   leadershipAccepted?: boolean;     // §2.9 phase 3 sign-off; gates Commit Split
-  sendCharlieToHllv?: boolean;      // §2.9: carry C/2-7 + B/ACD into HLLV intact on commit
+  intactTransfers?: IntactTransfer[]; // §2.9: companies carried intact into a battalion on commit
 }
 ```
 
@@ -702,22 +726,14 @@ chart view, previously planned here, is done — see [§2.10](#210-org-chart-vie
 
 - **Drag & Drop / Unit Builder — remaining ideas:** the Pool/Structure/Detail
   workbench rework is built (§2.3), on top of the earlier click-to-assign,
-  structure/leadership-aware build suggestions (§2.9 phase 5), the C→HLLV
-  intact transfer, and cross-company whole-squad moves (§2.3). Still open if
-  wanted:
-  - Generalizing the intact transfer (§2.9) to any company → either
-    battalion, not just C→HLLV.
-  - Smarter suggestion heuristics — MOS balancing *within* a company's
-    platoons (e.g. spreading medics evenly), on top of the current
-    practice-time clustering and squad-count-driven sizing.
+  structure/leadership-aware build suggestions with MOS-balanced platoon
+  distribution (§2.9 phase 5), the generalized any-company intact transfer
+  (§2.9), cross-company whole-squad moves (§2.3), and Battalion HQ staging
+  (§2.3). Still open if wanted:
   - A dedicated step-by-step build surface (battalion HQ → company
     leadership → platoon leadership → squads as explicit stages) if the
-    current single-company-tree-plus-strips view still feels like too much
-    at once once it's been used for a while.
-  - **Battalion HQ should be stageable too, not just companies.** Today
-    `Company.staged`/"Mark complete" only exists on individual companies;
-    `BattalionHQ` (CO/XO/SGM) has no equivalent lock/"complete" state once
-    the whole battalion's leadership is settled.
+    current single-company-tree-plus-strips view ever starts feeling like
+    too much at once — not pursued yet since that hasn't happened.
 - **Rank/MOS validation:** flag rank-inappropriate or MOS-mismatched billet
   assignments.
 - **Notes/flags:** per-trooper notes (medical, discipline, promotion review).

@@ -47,7 +47,7 @@ import { OrgChart } from "./components/OrgChart";
 import { RosterListView } from "./components/RosterListView";
 import { RosterFilterBar } from "./components/RosterFilterBar";
 import { EMPTY_FILTER, type RosterFilter } from "./lib/filterRoster";
-import { buildSplitRoster, INTACT_TRANSFER, SPLIT_GROUPS } from "./lib/splitReorg";
+import { buildSplitRoster, CHARLIE_LETTER, SPLIT_GROUPS } from "./lib/splitReorg";
 import { applySplitTags, type SplitTagImportResult, type SplitTagRow } from "./lib/splitTagImport";
 import { fillDefaultPracticeTimes } from "./lib/practiceDefaults";
 import { SplitPlanner } from "./components/SplitPlanner";
@@ -270,23 +270,28 @@ function App() {
     handleChange({ ...roster, leadershipAccepted: true });
   }
 
-  // "Send Charlie to HLLV intact": tags all of C's AND the B/ACD pool's
-  // members HLLV immediately (B/ACD is treated as stored under C/2-7 for
-  // this transfer — see INTACT_TRANSFER) so the sort counts and leadership
-  // review reflect it, and sets the flag Commit reads to carry both over as
-  // one unit. Composition changed either way, so the leadership sign-off
-  // resets.
-  function handleSetCharlieToHllv(enabled: boolean) {
+  // "Send this company intact" (to either battalion): tags all its members
+  // — and, for Charlie specifically, the B/ACD pool's too, since that's
+  // where Charlie's real people currently live — immediately, so the sort
+  // counts and leadership review reflect it, and records the transfer so
+  // Commit carries the whole unit over as one intact piece instead of
+  // individual per-trooper sorting. Passing null clears an existing
+  // transfer for that company (already-set tags are left as-is). Composition
+  // changed either way, so the leadership sign-off resets.
+  function handleSetIntactTransfer(letter: string, status: SplitStatus | null) {
     if (!roster) return;
     const next = structuredClone(roster);
-    next.sendCharlieToHllv = enabled;
+    const otherTransfers = (next.intactTransfers ?? []).filter((t) => t.letter !== letter);
+    next.intactTransfers = status ? [...otherTransfers, { letter, status }] : otherTransfers;
     next.leadershipAccepted = false;
-    if (enabled) {
-      const charlie = next.battalion.companies.find((c) => c.letter === "C");
-      if (charlie) {
-        for (const soldier of collectCompanySoldiers(charlie)) soldier.splitStatus = "hllv";
+    if (status) {
+      const company = next.battalion.companies.find((c) => c.letter === letter);
+      if (company) {
+        for (const soldier of collectCompanySoldiers(company)) soldier.splitStatus = status;
       }
-      for (const soldier of collectCompanySoldiers(next.unassigned)) soldier.splitStatus = "hllv";
+      if (letter === CHARLIE_LETTER) {
+        for (const soldier of collectCompanySoldiers(next.unassigned)) soldier.splitStatus = status;
+      }
     }
     handleChange(next);
   }
@@ -311,9 +316,9 @@ function App() {
   }
 
   // Test helper for playing with the split's later phases without sorting
-  // for real: coin-flips every trooper onto HLLV or HLLWW2. When the intact
-  // transfer is checked, Charlie + B/ACD are already force-tagged HLLV (see
-  // handleSetCharlieToHllv) and go over as one unit regardless of tag, so
+  // for real: coin-flips every trooper onto HLLV or HLLWW2. Any company with
+  // an active intact transfer (see handleSetIntactTransfer) is already
+  // force-tagged and goes over as one unit regardless of tag, so
   // randomizing them here would just fight that and get overwritten anyway —
   // skip them and only randomize everyone else.
   function handleRandomizeSplitTags() {
@@ -327,10 +332,12 @@ function App() {
     }
     const clone = structuredClone(roster);
     const skipIds = new Set<string>();
-    if (clone.sendCharlieToHllv) {
-      const charlie = clone.battalion.companies.find((c) => c.letter === INTACT_TRANSFER.letter);
-      if (charlie) for (const soldier of collectCompanySoldiers(charlie)) skipIds.add(soldier.userId);
-      for (const soldier of collectCompanySoldiers(clone.unassigned)) skipIds.add(soldier.userId);
+    for (const transfer of clone.intactTransfers ?? []) {
+      const company = clone.battalion.companies.find((c) => c.letter === transfer.letter);
+      if (company) for (const soldier of collectCompanySoldiers(company)) skipIds.add(soldier.userId);
+      if (transfer.letter === CHARLIE_LETTER) {
+        for (const soldier of collectCompanySoldiers(clone.unassigned)) skipIds.add(soldier.userId);
+      }
     }
     for (const soldier of collectAllSoldiers(clone)) {
       if (skipIds.has(soldier.userId)) continue;
@@ -352,7 +359,7 @@ function App() {
       return;
     }
     for (const { name, status } of SPLIT_GROUPS) {
-      const built = buildSplitRoster(roster, status, name, rankOrder ?? undefined, roster.sendCharlieToHllv ?? false);
+      const built = buildSplitRoster(roster, status, name, rankOrder ?? undefined, roster.intactTransfers ?? []);
       const existing = rosterList.find((r) => r.name === name);
       if (existing) {
         saveRoster(existing.id, built);
@@ -628,7 +635,7 @@ function App() {
           onBeginEditPracticeTimes={handleBeginEditPracticeTimes}
           onSavePracticeTimes={handleSavePracticeTimes}
           onAcceptLeadership={handleAcceptLeadership}
-          onSetCharlieToHllv={handleSetCharlieToHllv}
+          onSetIntactTransfer={handleSetIntactTransfer}
           onApplySuggestion={handleApplySuggestion}
         />
       )}

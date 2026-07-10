@@ -10,6 +10,7 @@ import {
   deletePlatoon,
   deleteSquad,
   setCompanyStaged,
+  setBattalionStaged,
   type SlotPath,
   type SoldierPatch,
   type SquadLocation,
@@ -23,7 +24,7 @@ import {
 } from "../lib/analytics";
 import { computeEchelonMap, ECHELON_LABELS, ECHELON_ORDER, type BilletEchelon } from "../lib/leadership";
 import { originCompanyLabel } from "../lib/changelog";
-import { INTACT_TRANSFER } from "../lib/splitReorg";
+import { intactExcludedLetters } from "../lib/splitReorg";
 import { suggestCompanies, applySuggestedCompanies } from "../lib/buildSuggestions";
 import {
   EMPTY_FILTER,
@@ -64,9 +65,11 @@ interface Actions {
   onRequestMoveSquad: (location: SquadLocation) => void;
   onSelectUnit: (unit: SelectedUnit) => void;
   onToggleStaged: (letter: string) => void;
+  onToggleBattalionStaged: () => void;
   // Whether the currently-displayed (active) company is staged/complete —
   // the Structure column only ever shows one company at a time, so this is
   // enough to gate every drop target and structural button inside it.
+  // Battalion HQ has its own independent staged state — see BattalionHQ.
   locked: boolean;
   filter: RosterFilter;
 }
@@ -158,11 +161,16 @@ function DroppableSlot({
   occupied,
   emptyLabel,
   soldier,
+  lockedOverride,
 }: {
   destination: SlotPath;
   occupied: boolean;
   emptyLabel: string;
   soldier: Soldier | null;
+  // Battalion HQ slots have their own independent staged/lock state (see
+  // BattalionHQ below) — the shared context's `locked` is scoped to the
+  // active *company*, so it'd be the wrong signal there.
+  lockedOverride?: boolean;
 }) {
   // A unique per-instance id, not a serialized destination — dnd-kit requires
   // unique droppable ids too, and the real target travels via `data`.
@@ -171,7 +179,8 @@ function DroppableSlot({
     id: dropId,
     data: { destination },
   });
-  const { filter, onRequestAssign, locked } = useActions();
+  const { filter, onRequestAssign, locked: contextLocked } = useActions();
+  const locked = lockedOverride ?? contextLocked;
   const className = [
     "drop-slot",
     isOver && (occupied || locked) ? "drop-blocked" : "",
@@ -187,7 +196,7 @@ function DroppableSlot({
         <button
           type="button"
           className={`vacant vacant-slot-btn${filter.vacantOnly ? " filter-match" : ""}`}
-          title={locked ? "Un-stage this company to assign billets" : "Click to pick someone for this billet (or drag a trooper here)"}
+          title={locked ? "Un-stage this to assign billets" : "Click to pick someone for this billet (or drag a trooper here)"}
           disabled={locked}
           onClick={() => onRequestAssign(destination)}
         >
@@ -553,7 +562,8 @@ function DragDropCompany({ company }: { company: Company }) {
 }
 
 function BattalionHQ({ battalion }: { battalion: Battalion }) {
-  const { onRequestAssign } = useActions();
+  const { onRequestAssign, onToggleBattalionStaged } = useActions();
+  const battalionLocked = battalion.staged === true;
   const strip: StripBillet[] = [
     {
       label: "CO",
@@ -579,17 +589,34 @@ function BattalionHQ({ battalion }: { battalion: Battalion }) {
     },
   ];
   return (
-    <details className="tree-node battalion-node" open>
+    <details className={`tree-node battalion-node${battalionLocked ? " staged" : ""}`} open>
       <summary>
-        {battalion.designation} Cavalry Battalion — CO:{" "}
+        {battalion.designation} Cavalry Battalion
+        {battalionLocked && <span className="staged-badge">STAGED</span>} — CO:{" "}
         <DroppableSlot
           destination={{ kind: "battalionCommander" }}
           occupied={battalion.commander !== null}
           emptyLabel="VACANT"
           soldier={battalion.commander}
+          lockedOverride={battalionLocked}
         />
         <LeadershipStrip billets={strip} />
         <DetailButton unit={{ kind: "battalion" }} />
+        <button
+          type="button"
+          className={`add-btn stage-toggle-btn${battalionLocked ? " staged" : ""}`}
+          title={
+            battalionLocked
+              ? "Un-stage: allow edits and drops again"
+              : "Mark complete: locks Battalion HQ until un-staged"
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleBattalionStaged();
+          }}
+        >
+          {battalionLocked ? "🔓 Un-stage" : "✅ Mark complete"}
+        </button>
       </summary>
       <div className="company-hq-row">
         XO:{" "}
@@ -598,6 +625,7 @@ function BattalionHQ({ battalion }: { battalion: Battalion }) {
           occupied={battalion.executiveOfficer !== null}
           emptyLabel="VACANT"
           soldier={battalion.executiveOfficer}
+          lockedOverride={battalionLocked}
         />{" "}
         | SGM:{" "}
         <DroppableSlot
@@ -605,6 +633,7 @@ function BattalionHQ({ battalion }: { battalion: Battalion }) {
           occupied={battalion.sergeantMajor !== null}
           emptyLabel="VACANT"
           soldier={battalion.sergeantMajor}
+          lockedOverride={battalionLocked}
         />
       </div>
     </details>
@@ -936,10 +965,7 @@ export function DragDropTree({
     () =>
       sourceRosterForSuggestions && suggestionStatus
         ? suggestCompanies(sourceRosterForSuggestions, suggestionStatus, {
-            excludeCompanies:
-              sourceRosterForSuggestions.sendCharlieToHllv && suggestionStatus === INTACT_TRANSFER.status
-                ? [INTACT_TRANSFER.letter, sourceRosterForSuggestions.unassigned.letter]
-                : [],
+            excludeCompanies: intactExcludedLetters(sourceRosterForSuggestions, suggestionStatus),
             usedLetters: roster.battalion.companies.map((c) => c.letter),
           })
         : { companies: [], warnings: [] },
@@ -1015,6 +1041,7 @@ export function DragDropTree({
       const target = roster.battalion.companies.find((c) => c.letter === letter);
       onChange(setCompanyStaged(roster, letter, !target?.staged));
     },
+    onToggleBattalionStaged: () => onChange(setBattalionStaged(roster, !roster.battalion.staged)),
     locked: activeCompany?.staged === true,
     filter,
   };

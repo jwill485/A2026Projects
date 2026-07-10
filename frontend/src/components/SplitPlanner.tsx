@@ -9,7 +9,7 @@ import {
   computeSquadMos,
 } from "../lib/analytics";
 import { bucketByTier, TIER_BILLETS, TIER_LABELS, TIER_ORDER } from "../lib/leadership";
-import { INTACT_TRANSFER, SPLIT_GROUPS } from "../lib/splitReorg";
+import { CHARLIE_LETTER, intactExcludedLetters, SPLIT_GROUPS } from "../lib/splitReorg";
 import { suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
 import { parseSplitTagCsv, type SplitTagImportResult, type SplitTagRow } from "../lib/splitTagImport";
 import { SuggestionPreview } from "./SuggestionPreview";
@@ -96,7 +96,7 @@ export function SplitPlanner({
   onBeginEditPracticeTimes,
   onSavePracticeTimes,
   onAcceptLeadership,
-  onSetCharlieToHllv,
+  onSetIntactTransfer,
   onApplySuggestion,
 }: {
   roster: RosterData;
@@ -113,7 +113,7 @@ export function SplitPlanner({
   onBeginEditPracticeTimes: () => void;
   onSavePracticeTimes: () => void;
   onAcceptLeadership: () => void;
-  onSetCharlieToHllv: (enabled: boolean) => void;
+  onSetIntactTransfer: (letter: string, status: SplitStatus | null) => void;
   onApplySuggestion: (targetId: string, suggestions: SuggestedCompany[]) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -214,10 +214,7 @@ export function SplitPlanner({
         b.status,
         b.data && activeConfiguration !== "new"
           ? suggestCompanies(roster, b.status, {
-              excludeCompanies:
-                roster.sendCharlieToHllv && b.status === INTACT_TRANSFER.status
-                  ? [INTACT_TRANSFER.letter, roster.unassigned.letter]
-                  : [],
+              excludeCompanies: intactExcludedLetters(roster, b.status),
               usedLetters: b.data.battalion.companies.map((c) => c.letter),
             })
           : { companies: [], warnings: [] },
@@ -323,19 +320,38 @@ export function SplitPlanner({
             ))}
           </div>
         )}
-        {activeConfiguration !== "new" &&
-          roster.battalion.companies.some((c) => c.letter === INTACT_TRANSFER.letter) && (
-            <label className="intact-flag">
-              <input
-                type="checkbox"
-                checked={!!roster.sendCharlieToHllv}
-                onChange={(e) => onSetCharlieToHllv(e.target.checked)}
-              />{" "}
-              Send B/ACD to Charlie Company (C/2-7), then send C/2-7 to HLLV{" "}
-              <strong>intact</strong> — Commit carries them as one unit (structure, leadership,
-              practice times) straight into HLLV instead of through its pool.
-            </label>
-          )}
+        {activeConfiguration !== "new" && roster.battalion.companies.length > 0 && (
+          <div className="intact-transfers">
+            <p className="intact-transfers-hint">
+              Send a whole company <strong>intact</strong> to a battalion instead of sorting it
+              trooper by trooper — Commit carries its structure, leadership, and practice times
+              straight over instead of through that battalion's pool.
+              {roster.battalion.companies.some((c) => c.letter === CHARLIE_LETTER) &&
+                " Charlie (C/2-7) also pulls B/ACD along with it, since that's where its real people currently live."}
+            </p>
+            {roster.battalion.companies.map((company) => {
+              const current = (roster.intactTransfers ?? []).find((t) => t.letter === company.letter)?.status ?? "";
+              return (
+                <label key={company.letter} className="intact-flag">
+                  {company.name} Company ({company.letter}){" "}
+                  <select
+                    value={current}
+                    onChange={(e) =>
+                      onSetIntactTransfer(company.letter, (e.target.value || null) as SplitStatus | null)
+                    }
+                  >
+                    <option value="">Keep individual tags</option>
+                    {SPLIT_GROUPS.map((g) => (
+                      <option key={g.status} value={g.status}>
+                        Send intact to {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="phase-card">

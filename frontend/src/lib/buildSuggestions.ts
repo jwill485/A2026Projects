@@ -80,6 +80,66 @@ function packClustersIntoBins<T>(clusters: T[][], binCount: number): T[][] {
   return bins;
 }
 
+function squadHeadcount(squad: SuggestedSquad): number {
+  return (squad.leader ? 1 : 0) + (squad.assistantLeader ? 1 : 0) + squad.members.length;
+}
+
+// squad.mos is already a most-common-first breakdown (computeMosBreakdown),
+// so its first entry is the squad's dominant specialty.
+function dominantMos(squad: SuggestedSquad): string {
+  return squad.mos[0]?.label ?? "No MOS";
+}
+
+// Distributes a company's squads across its platoons, keeping squads intact
+// (never split — that's a core design principle, see the file-top comment)
+// while trying to spread each dominant MOS roughly evenly across platoons —
+// e.g. so medics aren't all stacked in one platoon just because their
+// squads happened to land next to each other in the practice-time
+// clustering above. Greedy: processes squads in an order that interleaves
+// distinct dominant-MOS groups (round-robin merge, so same-MOS squads
+// aren't handled back-to-back), assigning each to whichever platoon
+// currently has the fewest people sharing that squad's dominant MOS (ties
+// broken by smallest current headcount, to keep platoon sizes reasonably
+// even too). Squad counts per platoon can end up less even than a blind
+// slice would give — an accepted trade-off for MOS balance being the
+// stated priority here.
+function distributeSquadsForMosBalance(squads: SuggestedSquad[], platoonCount: number): SuggestedSquad[][] {
+  const platoons: SuggestedSquad[][] = Array.from({ length: platoonCount }, () => []);
+  const mosCounts: Map<string, number>[] = Array.from({ length: platoonCount }, () => new Map());
+  const headcounts = new Array(platoonCount).fill(0);
+
+  const groups = new Map<string, SuggestedSquad[]>();
+  for (const squad of squads) {
+    const key = dominantMos(squad);
+    groups.set(key, [...(groups.get(key) ?? []), squad]);
+  }
+  const groupLists = [...groups.values()];
+  const order: SuggestedSquad[] = [];
+  for (let i = 0; order.length < squads.length; i++) {
+    for (const list of groupLists) {
+      if (i < list.length) order.push(list[i]);
+    }
+  }
+
+  for (const squad of order) {
+    const mos = dominantMos(squad);
+    let target = 0;
+    for (let p = 1; p < platoonCount; p++) {
+      const targetCount = mosCounts[target].get(mos) ?? 0;
+      const candidateCount = mosCounts[p].get(mos) ?? 0;
+      if (candidateCount < targetCount || (candidateCount === targetCount && headcounts[p] < headcounts[target])) {
+        target = p;
+      }
+    }
+    platoons[target].push(squad);
+    const headcount = squadHeadcount(squad);
+    headcounts[target] += headcount;
+    mosCounts[target].set(mos, (mosCounts[target].get(mos) ?? 0) + headcount);
+  }
+
+  return platoons;
+}
+
 export function suggestCompanies(
   source: RosterData,
   status: SplitStatus,
@@ -175,15 +235,9 @@ export function suggestCompanies(
       );
     }
 
-    const platoons: SuggestedPlatoon[] = [];
-    const base = Math.floor(k / platoonCount);
-    const extra = k % platoonCount;
-    let cursor = 0;
-    for (let p = 0; p < platoonCount; p++) {
-      const size = base + (p < extra ? 1 : 0);
-      platoons.push({ number: String(p + 1), squads: squads.slice(cursor, cursor + size) });
-      cursor += size;
-    }
+    const platoons: SuggestedPlatoon[] = distributeSquadsForMosBalance(squads, platoonCount).map(
+      (platoonSquads, p) => ({ number: String(p + 1), squads: platoonSquads }),
+    );
 
     const practiceTimes = [...new Set(squads.map((s) => s.practiceTime ?? "No practice time set"))].sort();
     return {
@@ -191,10 +245,7 @@ export function suggestCompanies(
       name: COMPANY_NAMES[letter] ?? letter,
       practiceTimes,
       platoons,
-      headcount: squads.reduce(
-        (sum, s) => sum + (s.leader ? 1 : 0) + (s.assistantLeader ? 1 : 0) + s.members.length,
-        0,
-      ),
+      headcount: squads.reduce((sum, s) => sum + squadHeadcount(s), 0),
     };
   });
 

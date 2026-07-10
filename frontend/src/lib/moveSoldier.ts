@@ -35,9 +35,17 @@ function findSquad(platoon: Platoon, number: string) {
   return platoon.squads.find((s) => s.number === number);
 }
 
-// A destination naming a company (everything except battalion billets and
-// the pool) is blocked once that company is staged/marked complete.
+// A destination naming a company is blocked once that company is
+// staged/marked complete; a battalion billet is blocked once Battalion HQ
+// itself is staged — the two are independent locks.
 function isDestinationLocked(roster: RosterData, destination: SlotPath): boolean {
+  if (
+    destination.kind === "battalionCommander" ||
+    destination.kind === "battalionXO" ||
+    destination.kind === "battalionSGM"
+  ) {
+    return roster.battalion.staged === true;
+  }
   if (!("company" in destination)) return false;
   return findCompany(roster, destination.company)?.staged === true;
 }
@@ -415,6 +423,15 @@ export function setCompanyStaged(roster: RosterData, letter: string, staged: boo
   if (!company) return roster;
   if (staged) company.staged = true;
   else delete company.staged;
+  return clone;
+}
+
+// Marks Battalion HQ "complete" (or un-marks it) — see Battalion.staged.
+// Independent of any company's own staged state.
+export function setBattalionStaged(roster: RosterData, staged: boolean): RosterData {
+  const clone = structuredClone(roster);
+  if (staged) clone.battalion.staged = true;
+  else delete clone.battalion.staged;
   return clone;
 }
 

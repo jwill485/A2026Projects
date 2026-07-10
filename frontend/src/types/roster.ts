@@ -59,6 +59,19 @@ export interface Battalion {
   executiveOfficer: Soldier | null;
   sergeantMajor: Soldier | null;
   companies: Company[];
+  // Same "Mark complete" concept as Company.staged, one level up: locks
+  // Battalion HQ (CO/XO/SGM) against reassignment once its leadership is
+  // settled. Independent of any individual company's staged state.
+  staged?: boolean;
+}
+
+// One company sent to a battalion as an intact unit on Commit Split —
+// structure, leadership, and practice times carried over, its members
+// bypassing the Unassigned pool entirely rather than going through the
+// per-trooper N/HLLV/HLLWW2 sort. See splitReorg.ts.
+export interface IntactTransfer {
+  letter: string;
+  status: SplitStatus;
 }
 
 export interface RosterData {
@@ -70,9 +83,8 @@ export interface RosterData {
   // Planning metadata like splitStatus: invisible to diffRosters.
   practiceTimesConfirmed?: boolean;
   leadershipAccepted?: boolean;
-  // §2.9: Charlie Company (C/2-7) transfers to HLLV as an intact company.
-  // Checking it auto-tags all of C's members HLLV; on Commit, the whole
-  // company (structure, leadership, practice times) lands in HLLV's
-  // battalion instead of its members going through the Unassigned pool.
-  sendCharlieToHllv?: boolean;
+  // §2.9: any number of companies can each transfer to either battalion as
+  // an intact unit — see IntactTransfer. Setting one auto-tags that
+  // company's members with its destination status.
+  intactTransfers?: IntactTransfer[];
 }
