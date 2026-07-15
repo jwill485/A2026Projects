@@ -105,6 +105,13 @@ function csvEscape(value: string): string {
   return value;
 }
 
+// Values like "1-7" or "8/14" look like dates to Excel/Sheets, which
+// silently reformats them on open. A leading apostrophe forces text — both
+// apps hide the apostrophe itself and just show the plain value.
+function forceText(value: string): string {
+  return `'${value}`;
+}
+
 // Exports exactly what the table is showing — current filter/search/sort
 // order, one row per visible member — not the per-graduation breakdown from
 // the expanded detail view.
@@ -116,12 +123,12 @@ function exportVisibleToCsv(members: Member[], prereqId: string, prereqColumnLab
       m.realName,
       m.username,
       m.rank,
-      m.battalion,
+      forceText(m.battalion),
       COMPANY_LABELS[m.company] ?? m.company,
       m.positionTitle,
       m.mos,
       String(m.graduations.length),
-      status ? `${status.requiredCompleted}/${status.requiredTotal}` : "",
+      status ? forceText(`${status.requiredCompleted}/${status.requiredTotal}`) : "",
     ];
   });
   const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n") + "\n";
