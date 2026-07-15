@@ -101,7 +101,7 @@ async function main() {
 
   const withGrads = members.filter((m) => m.graduations.length > 0).length;
   console.log(
-    `${members.length} members in scope (1-7/2-7/3-7/ACD), ${withGrads} with at least one graduation.`,
+    `${members.length} members in scope (1-7/2-7/3-7/ACD/Regiment), ${withGrads} with at least one graduation.`,
   );
   console.log(`Wrote output/graduations.json and output/graduations.csv`);
 }

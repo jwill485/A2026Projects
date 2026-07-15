@@ -1,9 +1,10 @@
 # Class Grads — How to Use
 
 A read-only viewer for 7th Cavalry Regiment class graduations — pulled live
-from the roster, covering every active member of 1-7, 2-7, 3-7, and ACD.
-Searchable by name, rank, MOS, position, or class, with dedicated filters
-for battalion, company, rank tier, graduated class, and WW2 Ranger
+from the roster, covering every active-duty member of the regiment: 1-7,
+2-7, 3-7, ACD, and Regimental/section staff (S1/S2/S6/MP/WAG/RRD/RDC,
+DEVCOM). Searchable by name, rank, MOS, position, or class, with dedicated
+filters for battalion, company, rank tier, graduated class, and WW2 Ranger
 Selection Requirement status.
 
 ## Running it locally
@@ -48,8 +49,9 @@ re-fetches live from the 7Cav API, so it can take a few seconds to populate.
 
 ## Using the app
 
-- **The table** — one row per active member across 1-7, 2-7, 3-7, and ACD:
-  Name, Rank, Battalion, Company, Position, MOS, a graduation count, and a
+- **The table** — one row per active-duty member across 1-7, 2-7, 3-7, ACD,
+  and Regimental/section staff: Name, Rank, Battalion, Company, Position,
+  MOS, a graduation count, and a
   WW2 Ranger Selection Requirement progress badge (`X/14`). Click any column
   header to sort by it — click again to reverse the direction.
 - **Click any row** to expand it and see two things side by side: that
@@ -87,12 +89,12 @@ to refresh those files.
 
 A member shows up in either the app or the pull script if their **current
 primary position** is anywhere in 1-7, 2-7, 3-7 (Battalion HQ, or any
-company/platoon/squad), or in the ACD holding pool (which has its own
-A/B/C/D companies). Regimental Staff (S1/S2/S6, Regimental CO/XO/CSM,
-Auxiliary/Reserve units, etc.), DEVCOM, unassigned "New Recruit" accounts,
-and obvious test accounts are all excluded — none of them have a
-company/platoon/squad-shaped position, so they never match the scoping
-rules to begin with.
+company/platoon/squad), the ACD holding pool (its own A/B/C/D companies), or
+any other active-duty billet: Regimental Staff (CO/XO/CSM and staff aides),
+S1/S2/S6, MP, WAG, RRD, RDC, or DEVCOM. Those show up under a **"Regiment"**
+battalion, with each section as its own "company." Unassigned "New Recruit"
+accounts, obvious test accounts, and Reserve-status billets are excluded —
+none of them count as active duty for this tool's purposes.
 
 ## WW2 Ranger Selection Requirement
 

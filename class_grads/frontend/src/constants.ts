@@ -13,8 +13,25 @@ export const TIER_LABELS: Record<Tier, string> = {
 
 // Company letters are shared across battalions (each battalion has its own
 // A/B/C/etc.) — combine with the Battalion filter to pin down a specific
-// one, e.g. Battalion=1-7 + Company=Able (A).
-export const COMPANY_ORDER = ["HQ", "A", "B", "C", "D", "E"];
+// one, e.g. Battalion=1-7 + Company=Able (A). The Regiment battalion's
+// "companies" are Regimental Staff sections rather than lettered companies.
+export const COMPANY_ORDER = [
+  "HQ",
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "Regimental Staff",
+  "S1",
+  "S2",
+  "S6",
+  "MP",
+  "WAG",
+  "RRD",
+  "RDC",
+  "DEVCOM",
+];
 
 export const COMPANY_LABELS: Record<string, string> = {
   HQ: "Battalion HQ",
@@ -25,4 +42,4 @@ export const COMPANY_LABELS: Record<string, string> = {
   E: "Easy (E)",
 };
 
-export const BATTALION_ORDER = ["1-7", "2-7", "3-7", "ACD"];
+export const BATTALION_ORDER = ["1-7", "2-7", "3-7", "ACD", "Regiment"];

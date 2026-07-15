@@ -3,7 +3,8 @@
 ## 1. Product Overview
 
 **Purpose:** A tool for tracking training-class graduations across the 7th
-Cavalry Regiment (1-7, 2-7, 3-7, and the ACD holding pool). Started as a way
+Cavalry Regiment — 1-7, 2-7, 3-7, the ACD holding pool, and every other
+active-duty billet (Regimental Staff, section staff, DEVCOM). Started as a way
 to just pull a list of who's graduated what; the eventual goal is a real
 class-graduation tracking system for the battalion, including tracking
 qualification for the WW2 Ranger Selection Requirement.
@@ -56,13 +57,23 @@ fine).
 **Scoping logic** (`classify_position()` in `backend/app/main.py`, mirrored
 in `src/scope.ts` as `classifyPosition()` for the CLI script): a profile
 counts as in-scope if its *current primary position* is anywhere in 1-7,
-2-7, 3-7 (Battalion HQ or any company/platoon/squad), or in the ACD holding
-pool (which has its own A/B/C/D companies). Regimental Staff, DEVCOM, "New
-Recruit," and test accounts are excluded by construction — their position
-titles don't match the company/platoon/squad-shaped patterns at all, so
-they never need an explicit exclusion check. Widened from 2-7-only to the
-whole regiment 2026-07-14; kept deliberately identical between the backend
-and the CLI script so the two never disagree on membership.
+2-7, 3-7 (Battalion HQ or any company/platoon/squad), the ACD holding pool
+(its own A/B/C/D companies), or — as of 2026-07-15 — any other active-duty
+billet: Regimental Staff, S1/S2/S6, MP, WAG, RRD, RDC, and DEVCOM, all
+bucketed under a synthetic **"Regiment"** battalion whose "companies" are
+those sections rather than lettered companies (DEVCOM keeps its internal
+platoon/squad structure but surfaces as company "DEVCOM," not "D"). Those
+titles use ad hoc naming (1IC/2IC/Lead/Senior Investigator/...) rather than
+line units' Commander/XO/1SG grid, so each is mapped individually
+(`REGIMENT_SECTION_ROLES`) and its tier is derived from actual rank
+(`rankDisplayOrder` from `milpacs/ranks`, bucketed into
+officer/seniorNco/juniorNco/trooper) rather than guessed from the title.
+"New Recruit," test accounts, and Reserve titles remain excluded by
+construction — their position titles don't match any known pattern.
+Widened from 2-7-only to the whole regiment 2026-07-14, then from
+line-battalions-only to every active-duty billet 2026-07-15; kept
+deliberately identical between the backend and the CLI script so the two
+never disagree on membership.
 
 ---
 
@@ -208,9 +219,12 @@ Ranger Selection status (see [§6.3](#63-other-possible-additions)).
   judgment calls about which wording variants are "the same" course (e.g.
   "Machine Gun Course" = "Machine Gunner Course"). Worth a sanity check by
   someone who knows the course history.
-- Regimental Staff and DEVCOM are currently excluded entirely from the app
-  (by choice, 2026-07-14) — revisit if leadership ever wants graduation
-  tracking for staff billets too.
+- Regimental Staff/S1/S2/S6/MP/WAG/RRD/RDC/DEVCOM tier is derived from rank
+  rather than title (2026-07-15, since those titles don't follow line units'
+  Commander/XO/1SG convention) — worth a sanity check that the
+  officer/seniorNco/juniorNco/trooper rank-order cutoffs in
+  `_tier_from_rank_order` land where leadership would expect for warrant
+  officers and "1IC/2IC/Lead" roles specifically.
 - `backend/data/groups.json` is a single unguarded file with no auth on the
   `/api/groups` write endpoints — fine for one trusted local user, not fine
   if this ever runs somewhere multiple people can reach it unauthenticated.

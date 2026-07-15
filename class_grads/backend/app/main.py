@@ -31,16 +31,20 @@ app.add_middleware(
 
 # Mirrors the position-title patterns RosterManager uses (buildRoster.ts),
 # widened to cover the whole regiment rather than just 2-7. In scope: the
-# three line battalions (1-7/2-7/3-7) and the ACD holding pool (its own
-# A/B/C/D companies) — Regimental Staff, DEVCOM, and titles with no
-# company/platoon/squad structure (New Recruit, test accounts) are
-# deliberately excluded and simply won't match any pattern below.
+# three line battalions (1-7/2-7/3-7), the ACD holding pool (its own A/B/C/D
+# companies), and — as of 2026-07-15 — every other active-duty billet
+# (Regimental Staff, S1/S2/S6/MP/WAG/RRD/RDC, DEVCOM), bucketed under a
+# synthetic "Regiment" battalion. New Recruit, test accounts, and Reserve
+# titles are deliberately excluded and simply won't match any pattern below.
 BATTALION_HQ_RE = re.compile(r"^(\d-7) (Commanding Officer|Executive Officer|Sergeant Major)$")
 COMPANY_HQ_RE = re.compile(r"^(Commander|Executive Officer|First Sergeant) ([A-Za-z])/([\w-]+)$")
 PLATOON_HQ_RE = re.compile(r"^(Platoon Leader|Platoon Sergeant) (\d+)/([A-Za-z])/([\w-]+)$")
 SQUAD_RE = re.compile(r"^(Section Leader|Assistant Section Leader|Trooper) (\d+)/(\d+)/([A-Za-z])/([\w-]+)$")
 
 LINE_BATTALION_RE = re.compile(r"^\d-7$")
+
+REGIMENT_BATTALION = "Regiment"
+DEVCOM_DESIGNATION = "DEVCOM"
 
 # ACD (the holding pool) has company-level leadership of its own but no
 # battalion-level HQ titles in the position-title schema — the "Auxiliary"
@@ -52,15 +56,64 @@ AUXILIARY_ACD_HQ_ROLES = {
     "Auxiliary Sergeant Major": "seniorNco",
 }
 
+# Regimental/section-staff billets use ad hoc naming (1IC/2IC/Lead/Senior
+# Investigator/...) rather than the Commander/XO/1SG grid line units follow,
+# so each title is mapped individually to a "company" bucket under the
+# synthetic Regiment battalion. Tier for these is derived from actual rank
+# (see _tier_from_rank_order) rather than guessed from the title.
+REGIMENT_SECTION_ROLES = {
+    "Regimental Commanding Officer": "Regimental Staff",
+    "Regimental Executive Officer": "Regimental Staff",
+    "Regimental Command Sergeant Major": "Regimental Staff",
+    "Regimental Chief of Staff": "Regimental Staff",
+    "Regimental Adjutant General": "Regimental Staff",
+    "Regimental Finance Officer": "Regimental Staff",
+    "Regimental Information Management Officer": "Regimental Staff",
+    "Regimental Recruiting Oversight Officer": "Regimental Staff",
+    "Regimental Security Operations Officer": "Regimental Staff",
+    "Regimental Technical Aide": "Regimental Staff",
+    "Aide to the SecOps": "Regimental Staff",
+    "S1 1IC": "S1",
+    "S1 Technical Aide": "S1",
+    "S2 1IC": "S2",
+    "S2 Senior Investigator": "S2",
+    "S6 1IC": "S6",
+    "S6 2IC": "S6",
+    "S6 Development Staff": "S6",
+    "MP 1IC": "MP",
+    "WAG 1IC": "WAG",
+    "RRD 1IC": "RRD",
+    "RDC Commander": "RDC",
+    "DEVCOM 1IC": "DEVCOM",
+    "DEVCOM 2IC": "DEVCOM",
+    "DEVCOM Lead": "DEVCOM",
+}
+
 
 def _unit_in_scope(unit: str) -> bool:
-    return bool(LINE_BATTALION_RE.match(unit)) or unit == "ACD"
+    return bool(LINE_BATTALION_RE.match(unit)) or unit in ("ACD", DEVCOM_DESIGNATION)
+
+
+# Ranks don't carry a tier field, so we bucket by rankDisplayOrder (see
+# milpacs/ranks) — used only for Regiment-bucket titles whose wording doesn't
+# reliably signal tier the way the line-unit Commander/XO/1SG grid does.
+def _tier_from_rank_order(rank_order: Optional[int]) -> str:
+    if rank_order is None:
+        return "trooper"
+    if rank_order <= 140:  # 2LT..GOA, WO1..CW5
+        return "officer"
+    if rank_order <= 195:  # SFC..CSM
+        return "seniorNco"
+    if rank_order <= 210:  # CPL/SGT/SSG
+        return "juniorNco"
+    return "trooper"  # PVT..SPC
 
 
 # Classifies an in-scope position title into the fields the frontend filters
 # on. Returns None if the title doesn't match a known pattern or falls
-# outside 1-7/2-7/3-7/ACD.
-def classify_position(position_title: Optional[str]) -> Optional[dict]:
+# outside 1-7/2-7/3-7/ACD/Regiment. rank_order (from milpacs/ranks'
+# rankDisplayOrder) is only consulted for Regiment-bucket titles.
+def classify_position(position_title: Optional[str], rank_order: Optional[int] = None) -> Optional[dict]:
     if not position_title:
         return None
 
@@ -70,6 +123,14 @@ def classify_position(position_title: Optional[str]) -> Optional[dict]:
             "company": "HQ",
             "tier": AUXILIARY_ACD_HQ_ROLES[position_title],
             "echelon": "battalion",
+        }
+
+    if position_title in REGIMENT_SECTION_ROLES:
+        return {
+            "battalion": REGIMENT_BATTALION,
+            "company": REGIMENT_SECTION_ROLES[position_title],
+            "tier": _tier_from_rank_order(rank_order),
+            "echelon": "company",
         }
 
     m = BATTALION_HQ_RE.match(position_title)
@@ -86,7 +147,7 @@ def classify_position(position_title: Optional[str]) -> Optional[dict]:
         if not _unit_in_scope(unit):
             return None
         tier = "seniorNco" if role == "First Sergeant" else "officer"
-        return {"battalion": unit, "company": letter, "tier": tier, "echelon": "company"}
+        return _devcom_normalized(unit, letter, tier, "company")
 
     m = PLATOON_HQ_RE.match(position_title)
     if m:
@@ -94,7 +155,7 @@ def classify_position(position_title: Optional[str]) -> Optional[dict]:
         if not _unit_in_scope(unit):
             return None
         tier = "seniorNco" if role == "Platoon Sergeant" else "officer"
-        return {"battalion": unit, "company": letter, "tier": tier, "echelon": "platoon"}
+        return _devcom_normalized(unit, letter, tier, "platoon")
 
     m = SQUAD_RE.match(position_title)
     if m:
@@ -102,9 +163,18 @@ def classify_position(position_title: Optional[str]) -> Optional[dict]:
         if not _unit_in_scope(unit):
             return None
         tier = "trooper" if role == "Trooper" else "juniorNco"
-        return {"battalion": unit, "company": letter, "tier": tier, "echelon": "squad"}
+        return _devcom_normalized(unit, letter, tier, "squad")
 
     return None
+
+
+# DEVCOM's own titles carry a company letter (e.g. "D") the way line-unit
+# titles do, but per the Regiment-grouping decision it should surface as its
+# own "DEVCOM" company bucket under Regiment rather than as company "D".
+def _devcom_normalized(unit: str, letter: str, tier: str, echelon: str) -> dict:
+    if unit == DEVCOM_DESIGNATION:
+        return {"battalion": REGIMENT_BATTALION, "company": DEVCOM_DESIGNATION, "tier": tier, "echelon": echelon}
+    return {"battalion": unit, "company": letter, "tier": tier, "echelon": echelon}
 
 
 def _require_api_key() -> str:
@@ -222,7 +292,9 @@ async def get_graduations():
         user = profile.get("user")
         primary = profile.get("primary") or {}
         position_title = primary.get("positionTitle")
-        classification = classify_position(position_title)
+        rank = profile.get("rank") or {}
+        rank_order = rank_order_by_id.get(rank.get("rankId"))
+        classification = classify_position(position_title, rank_order)
         if not user or not classification:
             continue
 
@@ -235,15 +307,13 @@ async def get_graduations():
             key=lambda g: g["date"],
         )
 
-        rank = profile.get("rank") or {}
-
         members.append(
             {
                 "userId": user["userId"],
                 "username": user["username"],
                 "realName": profile.get("realName", ""),
                 "rank": rank.get("rankShort", ""),
-                "rankOrder": rank_order_by_id.get(rank.get("rankId"), 999999),
+                "rankOrder": rank_order if rank_order is not None else 999999,
                 "positionTitle": position_title or "",
                 "mos": profile.get("mos") or "Unknown",
                 "battalion": classification["battalion"],
