@@ -1,0 +1,394 @@
+.split-planner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.planner-warning {
+  border: 1px dashed #d97757;
+  background: #241c1c;
+  border-radius: 6px;
+  padding: 0.5rem 0.8rem;
+  color: #e0a08a;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.phase-card {
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  background: #1c1c1c;
+  padding: 0.7rem 0.9rem;
+}
+
+.phase-card > header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+.phase-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.phase-card > p {
+  color: #bbb;
+  font-size: 0.85rem;
+  margin: 0.2rem 0 0.6rem 0;
+}
+
+.phase-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #14202e;
+  border: 1px solid #ffc72c;
+  color: #ffc72c;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.phase-chip {
+  margin-left: auto;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #3a3a3a;
+  color: #888;
+}
+
+.phase-chip-done {
+  background: #1c2a1c;
+  border-color: #4a7a4a;
+  color: #8fce8f;
+}
+
+.phase-chip-active {
+  background: #2a2414;
+  border-color: #ffc72c;
+  color: #ffc72c;
+}
+
+.sort-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sort-count {
+  font-size: 0.82rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid #3a3a3a;
+  color: #ccc;
+}
+
+.sort-neutral {
+  border-color: #d97757;
+  color: #e0a08a;
+}
+
+.sort-hllv {
+  border-color: #7ec8e3;
+  color: #7ec8e3;
+}
+
+.sort-hllww2 {
+  border-color: #e3a86b;
+  color: #e3a86b;
+}
+
+.sort-total {
+  color: #888;
+}
+
+.group-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+@media (max-width: 700px) {
+  .group-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.group-card {
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  background: #181818;
+}
+
+.group-hllv {
+  border-color: #2e5a6e;
+}
+
+.group-hllww2 {
+  border-color: #6e522e;
+}
+
+.group-card h4 {
+  margin: 0 0 0.4rem 0;
+  color: #fff;
+  font-size: 0.92rem;
+}
+
+.group-hllv h4 {
+  color: #7ec8e3;
+}
+
+.group-hllww2 h4 {
+  color: #e3a86b;
+}
+
+.group-headcount {
+  font-weight: normal;
+  font-size: 0.78rem;
+  color: #888;
+  margin-left: 0.4rem;
+}
+
+.tier-row {
+  border-top: 1px solid #2a2a2a;
+  padding: 0.25rem 0;
+}
+
+.tier-row summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #ddd;
+}
+
+.tier-name {
+  min-width: 6.5rem;
+  font-weight: 600;
+}
+
+.tier-count {
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: #333;
+  color: #ccc;
+  font-size: 0.78rem;
+}
+
+.tier-count-zero {
+  background: #3a2222;
+  color: #e08787;
+}
+
+.tier-billets {
+  color: #777;
+  font-size: 0.74rem;
+  font-style: italic;
+}
+
+.tier-row ul {
+  list-style: none;
+  margin: 0.2rem 0 0.2rem 0.5rem;
+  padding: 0;
+  font-size: 0.82rem;
+  color: #ccc;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.tier-empty {
+  color: #777;
+  font-style: italic;
+  font-size: 0.82rem;
+}
+
+.commit-split-btn {
+  font-weight: 600;
+}
+
+.sort-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.sort-actions .add-btn {
+  margin: 0;
+}
+
+.start-sorting-btn {
+  font-weight: 600;
+}
+
+.import-summary {
+  margin-top: 0.6rem;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  background: #181818;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  color: #ccc;
+}
+
+.import-summary p {
+  margin: 0.2rem 0;
+}
+
+.intact-transfers-hint {
+  color: #999;
+  font-size: 0.82rem;
+  margin: 0.6rem 0 0 0;
+}
+
+.intact-flag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid #2e5a6e;
+  border-radius: 6px;
+  background: #16222a;
+  color: #bcd;
+  font-size: 0.84rem;
+}
+
+.intact-flag select {
+  background: #222;
+  color: #eee;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+.signoff-question {
+  color: #ddd;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin: 0.6rem 0 0 0;
+}
+
+.sort-count.signoff-ok {
+  border-color: #4a7a4a;
+  color: #8fce8f;
+}
+
+.save-times-btn,
+.accept-leadership-btn {
+  margin-top: 0.6rem;
+  font-weight: 600;
+}
+
+.accept-leadership-btn.accepted:disabled {
+  color: #8fce8f;
+  cursor: default;
+}
+
+.commit-blockers {
+  list-style: none;
+  margin: 0.5rem 0 0 0;
+  padding: 0.4rem 0.7rem;
+  border: 1px dashed #d97757;
+  border-radius: 6px;
+  background: #241c1c;
+  color: #e0a08a;
+  font-size: 0.82rem;
+}
+
+.commit-blockers li {
+  padding: 0.1rem 0;
+}
+
+.commit-blockers li::before {
+  content: "✕ ";
+}
+
+.practice-list {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.practice-company h4 {
+  margin: 0 0 0.3rem 0;
+  color: #fff;
+  font-size: 0.88rem;
+}
+
+.practice-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.2fr) minmax(160px, 1.4fr) minmax(140px, 0.8fr);
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.25rem 0;
+  border-top: 1px solid #2a2a2a;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 700px) {
+  .practice-row {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}
+
+.practice-unit {
+  color: #ddd;
+  font-weight: 600;
+}
+
+.practice-mos {
+  color: #7ec8e3;
+  font-size: 0.78rem;
+}
+
+.practice-input {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.82rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.practice-input:focus-visible {
+  outline: 2px solid #ffc72c;
+  outline-offset: 1px;
+}
+
+.build-stats {
+  list-style: none;
+  margin: 0 0 0.5rem 0;
+  padding: 0;
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+.build-stats li {
+  padding: 0.12rem 0;
+}
+
+.build-stats li::before {
+  content: "○ ";
+  color: #777;
+}
+
+.build-stats li.stat-done::before {
+  content: "● ";
+  color: #8fce8f;
+}

@@ -1,0 +1,78 @@
+.soldier-form-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.soldier-form {
+  background: #1a1a19;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 1.2rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 280px;
+  color: #ddd;
+}
+
+.soldier-form h3 {
+  margin: 0 0 0.3rem 0;
+  color: #fff;
+}
+
+.soldier-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #c3c2b7;
+}
+
+.soldier-form input,
+.soldier-form select {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.soldier-form input:focus-visible,
+.soldier-form select:focus-visible {
+  outline: 2px solid #ffc72c;
+  outline-offset: 1px;
+}
+
+.soldier-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.soldier-form-actions button {
+  background: #222;
+  color: #ccc;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+}
+
+.soldier-form-actions button[type="submit"] {
+  background: #ffc72c;
+  color: #1a1a19;
+  border-color: #ffc72c;
+  font-weight: 600;
+}
+
+.soldier-form-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

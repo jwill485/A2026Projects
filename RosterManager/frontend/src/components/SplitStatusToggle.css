@@ -1,0 +1,40 @@
+.split-status-toggle {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+
+.split-status-btn {
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 0.12rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid #3a3a3a;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+}
+
+.split-status-btn:hover {
+  border-color: #666;
+  color: #ccc;
+}
+
+.split-status-btn.active.split-status-neutral {
+  background: #3a3a3a;
+  color: #eee;
+  border-color: #666;
+}
+
+.split-status-btn.active.split-status-hllv {
+  background: #14384a;
+  color: #7ec8e3;
+  border-color: #7ec8e3;
+}
+
+.split-status-btn.active.split-status-hllww2 {
+  background: #402a12;
+  color: #e3a86b;
+  border-color: #e3a86b;
+}

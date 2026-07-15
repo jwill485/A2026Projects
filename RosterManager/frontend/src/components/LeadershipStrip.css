@@ -1,0 +1,47 @@
+.leadership-strip {
+  display: inline-flex;
+  gap: 0.5rem;
+  margin-left: 0.6rem;
+  vertical-align: middle;
+}
+
+.strip-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.76rem;
+  cursor: pointer;
+  color: #999;
+}
+
+.strip-dot:disabled {
+  cursor: default;
+}
+
+.strip-symbol {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.strip-filled .strip-symbol {
+  color: #8fce8f;
+}
+
+.strip-vacant .strip-symbol {
+  color: #8a5a4a;
+}
+
+.strip-vacant:not(:disabled):hover {
+  color: #ffc72c;
+}
+
+.strip-vacant:not(:disabled):hover .strip-symbol {
+  color: #ffc72c;
+}
+
+.strip-label {
+  color: inherit;
+}

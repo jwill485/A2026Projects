@@ -1,0 +1,75 @@
+import type { Company, Platoon, Soldier, SplitStatus, Squad } from "../types/roster";
+
+export interface RosterFilter {
+  text: string;
+  rank: string;
+  mos: string;
+  // "" = any; otherwise only troopers whose split tag matches (unset counts as "neutral").
+  splitTag: "" | SplitStatus;
+  vacantOnly: boolean;
+}
+
+export const EMPTY_FILTER: RosterFilter = {
+  text: "",
+  rank: "",
+  mos: "",
+  splitTag: "",
+  vacantOnly: false,
+};
+
+export function isFilterActive(filter: RosterFilter): boolean {
+  return hasSoldierCriteria(filter) || filter.vacantOnly;
+}
+
+function hasSoldierCriteria(filter: RosterFilter): boolean {
+  return (
+    filter.text.trim() !== "" ||
+    filter.rank.trim() !== "" ||
+    filter.mos.trim() !== "" ||
+    filter.splitTag !== ""
+  );
+}
+
+export function matchesSoldier(soldier: Soldier, filter: RosterFilter): boolean {
+  if (!hasSoldierCriteria(filter)) return false;
+  const text = filter.text.trim().toLowerCase();
+  if (text && !soldier.realName.toLowerCase().includes(text) && !soldier.username.toLowerCase().includes(text)) {
+    return false;
+  }
+  if (filter.rank && soldier.rankShort !== filter.rank) return false;
+  if (filter.mos && soldier.mos !== filter.mos) return false;
+  if (filter.splitTag && (soldier.splitStatus ?? "neutral") !== filter.splitTag) return false;
+  return true;
+}
+
+function slotMatches(soldier: Soldier | null, filter: RosterFilter): boolean {
+  return soldier ? matchesSoldier(soldier, filter) : filter.vacantOnly;
+}
+
+export function squadHasMatch(squad: Squad, filter: RosterFilter): boolean {
+  // Assistant Squad Leader is an optional billet most squads don't have
+  // filled — unlike Squad Leader, an empty one doesn't count toward
+  // "vacant leadership only" (that would flag nearly every squad).
+  return (
+    slotMatches(squad.leader, filter) ||
+    (squad.assistantLeader ? matchesSoldier(squad.assistantLeader, filter) : false) ||
+    squad.members.some((m) => matchesSoldier(m, filter))
+  );
+}
+
+export function platoonHasMatch(platoon: Platoon, filter: RosterFilter): boolean {
+  return (
+    slotMatches(platoon.leader, filter) ||
+    slotMatches(platoon.sergeant, filter) ||
+    platoon.squads.some((s) => squadHasMatch(s, filter))
+  );
+}
+
+export function companyHasMatch(company: Company, filter: RosterFilter): boolean {
+  return (
+    slotMatches(company.commander, filter) ||
+    slotMatches(company.executiveOfficer, filter) ||
+    slotMatches(company.firstSergeant, filter) ||
+    company.platoons.some((p) => platoonHasMatch(p, filter))
+  );
+}
