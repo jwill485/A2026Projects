@@ -121,6 +121,22 @@ header h1 {
   border-color: var(--accent);
 }
 
+.export-csv {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  height: fit-content;
+}
+
+.export-csv:hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--accent);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

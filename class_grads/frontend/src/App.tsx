@@ -100,6 +100,40 @@ function prereqBadgeClass(status: PrereqStatus): string {
   return "ranger-badge";
 }
 
+function csvEscape(value: string): string {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+// Exports exactly what the table is showing — current filter/search/sort
+// order, one row per visible member — not the per-graduation breakdown from
+// the expanded detail view.
+function exportVisibleToCsv(members: Member[], prereqId: string, prereqColumnLabel: string) {
+  const headers = ["Name", "Username", "Rank", "Battalion", "Company", "Position", "MOS", "Graduations", prereqColumnLabel];
+  const rows = members.map((m) => {
+    const status = prereqStatusFor(m, prereqId);
+    return [
+      m.realName,
+      m.username,
+      m.rank,
+      m.battalion,
+      COMPANY_LABELS[m.company] ?? m.company,
+      m.positionTitle,
+      m.mos,
+      String(m.graduations.length),
+      status ? `${status.requiredCompleted}/${status.requiredTotal}` : "",
+    ];
+  });
+  const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n") + "\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `7cav-course-graduations-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function App() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -417,6 +451,14 @@ export default function App() {
                 Clear filters
               </button>
             )}
+
+            <button
+              type="button"
+              className="export-csv"
+              onClick={() => exportVisibleToCsv(sorted, prereqId, selectedPrereqName)}
+            >
+              Export CSV ({sorted.length})
+            </button>
 
             <button type="button" className="manage-groups" onClick={() => setShowGroupsPanel(true)}>
               Manage Groups{groups.length > 0 && ` (${groups.length})`}
