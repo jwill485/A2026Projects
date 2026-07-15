@@ -22,8 +22,13 @@ MILPACS_BASE_URL = "https://api.7cav.us/api/v1"
 
 app = FastAPI(title="ClassGrads Backend")
 
+# ALLOWED_ORIGIN is the deployed frontend's URL in production (e.g. a Render
+# static site) -- unset locally, where the regex below covers every dev port.
+_extra_origins = [o for o in [os.environ.get("ALLOWED_ORIGIN")] if o]
+
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=_extra_origins,
     # Regex rather than a fixed port: with the hub plus both standalone
     # frontends all defaulting to 5173, Vite auto-increments (5174, 5175...)
     # whenever more than one is running locally at once.

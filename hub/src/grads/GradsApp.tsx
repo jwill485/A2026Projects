@@ -4,7 +4,7 @@ import { BATTALION_ORDER, COMPANY_LABELS, COMPANY_ORDER, TIER_LABELS, TIER_ORDER
 import { GroupsPanel } from "./GroupsPanel";
 import type { Group, GroupRequirement, Member } from "./types";
 
-const BACKEND_URL = "http://localhost:8001";
+const BACKEND_URL = import.meta.env.VITE_GRADS_BACKEND_URL || "http://localhost:8001";
 const ALL = "All";
 
 // The built-in WW2 Ranger Selection Requirement is presented as just
