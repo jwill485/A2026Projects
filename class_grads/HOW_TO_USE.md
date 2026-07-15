@@ -88,8 +88,11 @@ cd "C:\Users\cskat\OneDrive\Desktop\7Cav\a2026Projects\class_grads"
 npm run pull
 ```
 This writes `output/graduations.json` and `output/graduations.csv` — the
-same data as the web view, as a point-in-time snapshot. Re-run it any time
-to refresh those files.
+same data as the web view (including WW2 Ranger Selection Requirement
+status and any Custom Groups defined in `backend/data/groups.json`, one
+column per group in the CSV), as a point-in-time snapshot. Re-run it any
+time to refresh those files. Doesn't require the backend to be running —
+it talks to the 7Cav API directly.
 
 ## What counts as "in scope"
 

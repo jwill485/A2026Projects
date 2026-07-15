@@ -49,10 +49,14 @@ fine).
   `/api/graduations` on load, renders a filterable/sortable/expandable
   table. No local state persistence — every page load is a fresh live pull.
 - **`src/pullGraduations.ts`** (repo root, Node/TS) — standalone CLI script,
-  independent of the backend/frontend. Same fetch+filter+extract logic
-  (battalion/company only — no Ranger Selection matching yet, see
-  [§6.3](#63-other-possible-additions)), written to `output/graduations.json`
-  / `.csv` for a point-in-time snapshot.
+  independent of the backend/frontend (talks to the 7Cav API directly, not
+  through the FastAPI backend). Same scope/classification, WW2 Ranger
+  Selection Requirement matching (`src/ranger.ts`, mirroring
+  `backend/app/ranger.py`), and Custom Group status (`src/groups.ts`,
+  mirroring `groups_store.py` + `compute_group_status()`, reading the same
+  `backend/data/groups.json`) as the web app — added 2026-07-15, see §4.7.
+  Written to `output/graduations.json` / `.csv` for a point-in-time
+  snapshot.
 
 **Scoping logic** (`classify_position()` in `backend/app/main.py`, mirrored
 in `src/scope.ts` as `classifyPosition()` for the CLI script): a profile
@@ -202,14 +206,18 @@ tolerance too.
   entirely if no groups exist yet) — unaffected by which one is selected in
   the table column/filter.
 
-Not yet mirrored into the CLI pull script — see
-[§6.3](#63-other-possible-additions).
+Mirrored into the CLI pull script as of 2026-07-15 — see §4.7.
 
 ### 4.7 CLI snapshot
 
 `npm run pull` (repo root) writes `output/graduations.json` / `.csv` — same
-scope as the web app, useful for spreadsheet work. Does not yet include
-Ranger Selection status (see [§6.3](#63-other-possible-additions)).
+scope, WW2 Ranger Selection Requirement status, and Custom Group status as
+the web app, useful for spreadsheet work. The CSV gets one column per
+Custom Group (by name) plus `RangerCompleted`/`RangerTotal`/
+`RangerQualified`; Battalion and group-status values are apostrophe-guarded
+against Excel's date coercion, the same fix applied to the web app's own
+"Export CSV" button (which exports only the current filtered/sorted table
+view, not a full snapshot). Doesn't require the backend running.
 
 ---
 
@@ -257,11 +265,9 @@ could instead narrow to only the letters that exist in the currently
 selected battalion, if that turns out to matter in practice.
 
 ### 6.3 Other possible additions
-- Bring Ranger Selection matching into the CLI pull script too, so
-  `output/graduations.csv` carries the same qualification data as the web
-  app.
-- CSV import/export parity with the table view (right now only the CLI
-  script produces CSV, and without Ranger Selection columns).
+- ~~Bring Ranger Selection matching into the CLI pull script~~ — done
+  2026-07-15 (§4.7), along with Custom Group status and CSV export from the
+  web table view itself.
 - Deployment beyond localhost, if this becomes something more than one
   person's tool (mirrors RosterManager's same open question).
 

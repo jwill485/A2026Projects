@@ -1,6 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import "./grads.css";
-import patchEmblem from "./assets/1cd-patch.png";
 import { BATTALION_ORDER, COMPANY_LABELS, COMPANY_ORDER, TIER_LABELS, TIER_ORDER } from "./constants";
 import { GroupsPanel } from "./GroupsPanel";
 import type { Group, GroupRequirement, Member } from "./types";
@@ -358,7 +357,6 @@ export default function GradsApp() {
             </p>
           )}
         </div>
-        <img src={patchEmblem} alt="1st Cavalry Division patch" className="emblem" />
       </header>
 
       {error && <p className="error">Failed to load: {error}</p>}
