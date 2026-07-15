@@ -1,5 +1,11 @@
 # RosterManager — How to Use
 
+> **New:** RosterManager is now also reachable through the shared
+> `hub/` app alongside Course Graduations — see
+> `../hub/HOW_TO_USE.md`. That's the primary way to run it going forward;
+> these standalone instructions below still work independently if you just
+> want RosterManager on its own.
+
 A visual tool for managing the 2-7 Cavalry Battalion's org structure: view the
 live roster, drag-and-drop troopers between billets, track changes, and build
 out custom/alternate rosters — including breaking the battalion down into a

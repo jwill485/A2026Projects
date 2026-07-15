@@ -270,32 +270,48 @@ selected battalion, if that turns out to matter in practice.
 ## 7. Broader vision: unit management app
 
 Noted 2026-07-14: class_grads is intended as one piece of a larger app for
-unit management, alongside RosterManager. Not designed yet — this is a
-placeholder to capture the intent, not a commitment to a shape. Things
-worth thinking through whenever that conversation actually happens:
+unit management, alongside RosterManager. **Compose** was chosen over
+**merge** and built 2026-07-15: a third project, `hub/` (see its own
+`HOW_TO_USE.md`), is a `react-router-dom` shell that mounts both projects'
+existing frontend code under `/roster` and `/grads` routes, unmodified
+except for CSS scoping (RosterManager's `:root`/`#root`-based theme is
+wrapped under a `.roster-app` class so it doesn't leak into the shell or
+class_grads' pages). Each app keeps its own FastAPI backend and its own
+data — RosterManager's local-storage rosters/change logs, class_grads'
+`groups.json` — nothing about their data models or APIs changed. The two
+backends now run on different ports simultaneously (RosterManager 8000,
+class_grads 8001) since the hub talks to both at once; each backend's CORS
+now allows a range of localhost ports (`517\d`) rather than a fixed one,
+since running the hub plus either standalone frontend means Vite's
+auto-increment can land on 5174/5175/etc.
 
-- **Merge vs. compose.** Would RosterManager and class_grads become one
-  codebase (shared backend, shared frontend shell with multiple views), or
-  stay separate apps that share conventions (both already do: the
-  `MILPACS_API_KEY` `.env` pattern, FastAPI + React/Vite, similar
-  scoping-logic structure)? A shared backend would mean one FastAPI app
-  exposing both roster-management and class-tracking endpoints; composing
-  would mean two backends a future shell app talks to.
+Still open, now that the frontend piece is done:
+
+- **Merge vs. stay composed.** The hub proves composing works for the UI
+  layer; a full merge (one FastAPI backend exposing both roster-management
+  and class-tracking endpoints, one shared data model) is still a bigger,
+  separate step — not started.
 - **Auth**, if this ever serves more than one trusted person on one
-  machine — right now neither app has any (RosterManager's `.env` even has
-  an unused `JWT_SECRET`, suggesting this was anticipated). Directly
+  machine — right now neither backend has any (RosterManager's `.env` even
+  has an unused `JWT_SECRET`, suggesting this was anticipated, and its
+  `multi-user-auth` git branch has an unmerged JWT scaffold). Directly
   relevant to the `groups.json` write-endpoint concern in
-  [§5](#5-open-follow-ups-from-this-round).
+  [§5](#5-open-follow-ups-from-this-round). Production auth/routing would
+  sit behind a reverse proxy mapping clean paths to each backend — unrelated
+  to today's local dev-port choice.
 - **Shared domain logic.** Both projects independently derive
   battalion/company/tier from `positionTitle` regexes (RosterManager's
   `buildRoster.ts`, class_grads' `main.py` + `scope.ts`) — three
-  implementations of the same rules today. A real merge would want one
-  shared source of truth instead of three copies kept manually in sync by
-  convention.
+  implementations of the same rules today, and mounting them side by side
+  in the hub didn't change that. A real merge would want one shared source
+  of truth instead of three copies kept manually in sync by convention.
 - **What RosterManager gets from this direction**: a live class-completion
   view alongside its roster/split-planning tools. **What class_grads gets**:
   RosterManager's multi-roster/planning concepts, if qualification tracking
   ever needs to feed into "who's eligible to be assigned where."
-
-No action items yet — surface this doc (or [§4.6](#46-custom-requirement-groups)'s
-`groups.json` approach specifically) when that design conversation happens.
+- **Are the standalone frontends still needed?** `RosterManager/frontend`
+  and `class_grads/frontend` are untouched and still fully functional on
+  their own — the hub only added a third project, it didn't remove
+  anything. Worth deciding at some point whether to keep maintaining both
+  entry points or retire the standalone ones now that the hub covers the
+  same ground.

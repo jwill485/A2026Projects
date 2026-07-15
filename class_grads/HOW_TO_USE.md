@@ -1,5 +1,11 @@
 # Class Grads — How to Use
 
+> **New:** Course Graduations is now also reachable through the shared
+> `hub/` app alongside RosterManager — see `../hub/HOW_TO_USE.md`. That's
+> the primary way to run it going forward; these standalone instructions
+> below still work independently if you just want this app on its own
+> (note the backend port differs: standalone uses 8000, the hub uses 8001).
+
 A read-only viewer for 7th Cavalry Regiment class graduations — pulled live
 from the roster, covering every active-duty member of the regiment: 1-7,
 2-7, 3-7, ACD, and Regimental/section staff (S1/S2/S6/MP/WAG/RRD/RDC,

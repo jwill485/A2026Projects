@@ -16,7 +16,10 @@ app = FastAPI(title="RosterManager Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    # Regex rather than a fixed port: with the hub plus both standalone
+    # frontends all defaulting to 5173, Vite auto-increments (5174, 5175...)
+    # whenever more than one is running locally at once.
+    allow_origin_regex=r"http://localhost:517\d",
     allow_methods=["GET"],
     allow_headers=["*"],
 )

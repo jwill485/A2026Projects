@@ -1,0 +1,132 @@
+/* 7cav.us brand palette — shared with RosterManager and class_grads so the
+   hub and both mounted apps read as one product. */
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+
+  --bg: #171717;
+  --bg-panel: #1e1e1e;
+  --bg-panel-hover: #242424;
+  --border: #313131;
+  --text: #f1f1f1;
+  --text-muted: #a1a1a1;
+  --accent: #ebc729;
+  --accent-dim: #8d7420;
+  --success: #509652;
+  --danger: #d9382c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1rem 1rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sidebar-emblem {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.sidebar-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar-nav a {
+  display: block;
+  padding: 0.65rem 1rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+
+.sidebar-nav a:hover {
+  color: var(--text);
+  background: var(--bg-panel-hover);
+}
+
+.sidebar-nav a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--bg-panel-hover);
+}
+
+.shell-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.home {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+}
+
+.home h1 {
+  color: var(--accent);
+  margin-bottom: 0.25rem;
+}
+
+.home-intro {
+  color: var(--text-muted);
+  margin-top: 0;
+}
+
+.home-cards {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.home-card {
+  display: block;
+  padding: 1.25rem 1.5rem;
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.home-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-panel-hover);
+  color: var(--accent);
+}
