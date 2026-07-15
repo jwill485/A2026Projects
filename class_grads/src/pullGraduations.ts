@@ -33,11 +33,21 @@ function csvEscape(value: string): string {
   return value;
 }
 
-// Values like "1-7" or "8/14" look like dates to Excel/Sheets, which
-// silently reformats them on open. A leading apostrophe forces text — both
-// apps hide the apostrophe itself and just show the plain value.
+// A leading apostrophe forces spreadsheet apps to treat a cell as plain
+// text (both hide the apostrophe itself). Needed for two different Excel/
+// Sheets quirks: (1) unconditionally, for values like "1-7" or "8/14" that
+// get silently reformatted as dates, and (2) for any value starting with
+// =, +, -, @, tab, or CR, which spreadsheet apps may instead evaluate as a
+// formula — milpacs records (real names, position titles, class text) are
+// entered by many people over the years, so this isn't just theoretical.
 function forceText(value: string): string {
   return `'${value}`;
+}
+
+const FORMULA_INJECTION_RE = /^[=+\-@\t\r]/;
+
+function csvCell(value: string): string {
+  return FORMULA_INJECTION_RE.test(value) ? forceText(value) : value;
 }
 
 async function main() {
@@ -99,7 +109,7 @@ async function main() {
       "RangerCompleted",
       "RangerTotal",
       "RangerQualified",
-      ...groupColumns,
+      ...groupColumns.map(csvCell),
       "GraduationDetails",
       "GraduationDate",
     ]
@@ -109,13 +119,13 @@ async function main() {
   for (const member of members) {
     const groupValues = member.groups.map((g) => forceText(`${g.requiredCompleted}/${g.requiredTotal}`));
     const base = [
-      member.username,
-      member.realName,
-      member.rank,
+      csvCell(member.username),
+      csvCell(member.realName),
+      csvCell(member.rank),
       forceText(member.battalion),
-      member.company,
-      member.positionTitle,
-      member.mos,
+      csvCell(member.company),
+      csvCell(member.positionTitle),
+      csvCell(member.mos),
       String(member.ranger.requiredCompleted),
       String(member.ranger.requiredTotal),
       member.ranger.qualified ? "Yes" : "No",
@@ -125,7 +135,7 @@ async function main() {
       csvRows.push([...base, "", ""].map(csvEscape).join(","));
     } else {
       for (const grad of member.graduations) {
-        csvRows.push([...base, grad.details, grad.date].map(csvEscape).join(","));
+        csvRows.push([...base, csvCell(grad.details), grad.date].map(csvEscape).join(","));
       }
     }
   }

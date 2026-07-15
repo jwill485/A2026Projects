@@ -105,28 +105,48 @@ function csvEscape(value: string): string {
   return value;
 }
 
-// Values like "1-7" or "8/14" look like dates to Excel/Sheets, which
-// silently reformats them on open. A leading apostrophe forces text — both
-// apps hide the apostrophe itself and just show the plain value.
+// A leading apostrophe forces spreadsheet apps to treat a cell as plain
+// text (both hide the apostrophe itself). Needed for two different Excel/
+// Sheets quirks: (1) unconditionally, for values like "1-7" or "8/14" that
+// get silently reformatted as dates, and (2) for any value starting with
+// =, +, -, @, tab, or CR, which spreadsheet apps may instead evaluate as a
+// formula — milpacs records (real names, position titles, class text) are
+// entered by many people over the years, so this isn't just theoretical.
 function forceText(value: string): string {
   return `'${value}`;
+}
+
+const FORMULA_INJECTION_RE = /^[=+\-@\t\r]/;
+
+function csvCell(value: string): string {
+  return FORMULA_INJECTION_RE.test(value) ? forceText(value) : value;
 }
 
 // Exports exactly what the table is showing — current filter/search/sort
 // order, one row per visible member — not the per-graduation breakdown from
 // the expanded detail view.
 function exportVisibleToCsv(members: Member[], prereqId: string, prereqColumnLabel: string) {
-  const headers = ["Name", "Username", "Rank", "Battalion", "Company", "Position", "MOS", "Graduations", prereqColumnLabel];
+  const headers = [
+    "Name",
+    "Username",
+    "Rank",
+    "Battalion",
+    "Company",
+    "Position",
+    "MOS",
+    "Graduations",
+    csvCell(prereqColumnLabel),
+  ];
   const rows = members.map((m) => {
     const status = prereqStatusFor(m, prereqId);
     return [
-      m.realName,
-      m.username,
-      m.rank,
+      csvCell(m.realName),
+      csvCell(m.username),
+      csvCell(m.rank),
       forceText(m.battalion),
-      COMPANY_LABELS[m.company] ?? m.company,
-      m.positionTitle,
-      m.mos,
+      csvCell(COMPANY_LABELS[m.company] ?? m.company),
+      csvCell(m.positionTitle),
+      csvCell(m.mos),
       String(m.graduations.length),
       status ? forceText(`${status.requiredCompleted}/${status.requiredTotal}`) : "",
     ];
