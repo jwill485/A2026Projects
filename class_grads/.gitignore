@@ -1,0 +1,9 @@
+node_modules/
+.env
+output/
+.venv/
+__pycache__/
+dist/
+backend/data/
+*.out.log
+*.err.log
