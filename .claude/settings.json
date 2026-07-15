@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node panebug.test.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' npx tsx src/lib/importCompany.test.mts)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node importcompany.test.mjs)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node shot.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' npx tsx src/lib/importUnassigned.test.mts)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node acdtest.test.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' npx tsx src/lib/originlabel.test.mts)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node origincheck.test.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node toggletest.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node /tmp/contrast.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' npx tsx src/lib/configtag.test.mts)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node configbadge.test.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node finalcheck.test.mjs)",
+      "Bash(rm finalcheck.test.mjs)",
+      "Bash(grep -c '^```' battalion_roster_design_doc.md)",
+      "Bash(grep -viE \"Soldier\\(Patch|Form|Picker|FormValues|s\\\\.map|s: Soldier\\)|import .*Soldier|from \\\\\"|type Soldier|soldier: Soldier|onImportSoldier|onAddSoldier|onEditSoldier|onDeleteSoldier|handleImportSoldier|handleAddSoldier|handleEditSoldier|handleDeleteSoldier|soldier\\\\.userId|soldier\\\\.rankShort|soldier\\\\.realName|collectAllSoldiers|describeSoldierLocations|moveSoldier|updateSoldier|deleteSoldier|addSoldierTo|makeSoldier|countCompanySoldiers|editingSoldier|creatingSoldier|soldier-username|soldier-name|soldier-form|draggable-soldier|Soldier\\\\[\\\\]|Soldier \\\\| null|soldier={|soldier,|soldiers = collect|const soldiers|\\\\.soldier\\\\b\")",
+      "Bash(grep -n '^```' battalion_roster_design_doc.md)",
+      "Read(//tmp/**)",
+      "Bash(awk --version)",
+      "Bash(awk '{gsub\\(/\\\\bsoldier\\\\b/,\"trooper\"\\); print}')",
+      "Bash(sed -E ' *)",
+      "Bash(grep -n \"Soldier\\\\|soldier\" /tmp/design_doc_renamed.md)",
+      "Bash(sed -i '479s/matches the actual `Trooper` shape/matches the actual `Soldier` shape/' /tmp/design_doc_renamed.md)",
+      "Bash(sed -n '477,489p' /tmp/design_doc_renamed.md)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node orgchart.test.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node shot2.mjs)",
+      "Bash(PATH='/c/Program Files/nodejs:__TRACKED_VAR__' node diag.mjs)",
+      "Bash(npx tsc *)",
+      "PowerShell(Get-Command node -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command npm -ErrorAction SilentlyContinue)",
+      "Read(//c/Program Files/nodejs/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Users/cskat/AppData/Roaming/**)",
+      "Read(//c//**)",
+      "Bash(curl -s -o /dev/null -w \"backend:%{http_code}\\\\n\" http://localhost:8000/docs)",
+      "Bash(curl -s -o /dev/null -w \"frontend:%{http_code}\\\\n\" http://localhost:5173)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8000,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -Property LocalPort,OwningProcess\")",
+      "Bash(powershell -Command \"Stop-Process -Id 28020,37292 -Force\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Select-Object -Property LocalPort,OwningProcess\")"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

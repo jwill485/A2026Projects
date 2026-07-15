@@ -17,7 +17,7 @@ on this machine, so day-to-day you just need the four commands below.)
 
 Open a terminal (PowerShell is fine) and run:
 ```
-cd "C:\Users\cskat\OneDrive\Desktop\7Cav\RosterManager\backend"
+cd "C:\Users\cskat\OneDrive\Desktop\7Cav\a2026Projects\RosterManager\backend"
 .venv\Scripts\activate
 uvicorn app.main:app --reload --port 8000
 ```
@@ -27,7 +27,7 @@ uvicorn app.main:app --reload --port 8000
 
 Open a **second** terminal (don't reuse the first one) and run:
 ```
-cd "C:\Users\cskat\OneDrive\Desktop\7Cav\RosterManager\frontend"
+cd "C:\Users\cskat\OneDrive\Desktop\7Cav\a2026Projects\RosterManager\frontend"
 npm run dev
 ```
 
