@@ -1,0 +1,356 @@
+/* Self-contained styles for the Projects route -- reuses hub's shared
+   :root palette (index.css) but doesn't rely on grads.css/roster.css,
+   which are scoped to their own routes. */
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  color: var(--accent);
+}
+
+.summary {
+  color: var(--text-muted);
+  margin-top: 0;
+}
+
+.loading {
+  color: var(--text-muted);
+}
+
+.search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.8rem;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.filter-bar select {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-width: 260px;
+  background: var(--bg-panel);
+  color: var(--text);
+}
+
+.filter-bar select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.clear-filters,
+.new-project-button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  height: fit-content;
+}
+
+.new-project-button {
+  margin-left: auto;
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.clear-filters:hover,
+.new-project-button:hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--accent);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead th {
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  padding: 0.5rem;
+  color: var(--text-muted);
+}
+
+thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+thead th.sortable:hover {
+  color: var(--accent);
+}
+
+.sort-arrow {
+  margin-left: 0.3em;
+  font-size: 0.7em;
+  color: var(--accent);
+}
+
+.member-row {
+  cursor: pointer;
+}
+
+.member-row:hover {
+  background: var(--bg-panel);
+}
+
+.member-row td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.chevron {
+  width: 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.detail-row td {
+  background: var(--bg-panel);
+  padding: 0.75rem 0.5rem 0.75rem 2rem;
+  color: var(--text-muted);
+}
+
+.project-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.project-row-actions button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.project-row-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.confirm-delete-label {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.confirm-delete-yes {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+}
+
+.status-badge,
+.priority-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.status-planning {
+  color: var(--text-muted);
+}
+
+.status-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.status-complete {
+  border-color: var(--success);
+  background: rgba(80, 150, 82, 0.15);
+  color: var(--success);
+}
+
+.status-shelved {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.priority-low {
+  color: var(--text-muted);
+}
+
+.priority-medium {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.priority-high {
+  border-color: var(--danger);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.empty {
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 2rem;
+}
+
+/* Editor modal -- shared overlay/panel shell with class_grads' Custom
+   Groups panel (same class names, but this file is scoped to /projects
+   only, so no cross-route collision even though grads.css defines the
+   same selectors for its own route). */
+
+.groups-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.groups-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 560px;
+}
+
+.groups-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.groups-panel-header h3 {
+  margin: 0;
+  color: var(--accent);
+}
+
+.close-panel {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.close-panel:hover {
+  color: var(--text);
+}
+
+.project-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.project-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.project-field input,
+.project-field select,
+.project-field textarea {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.project-field-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.project-editor-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.save-project {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--success);
+  border-radius: 6px;
+  background: rgba(80, 150, 82, 0.15);
+  color: var(--success);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.save-project:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cancel-project {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cancel-project:hover {
+  border-color: var(--text-muted);
+}
