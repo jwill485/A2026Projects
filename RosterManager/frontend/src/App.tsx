@@ -15,7 +15,7 @@ import {
 } from "./lib/moveSoldier";
 import { collectAllSoldiers, collectCompanySoldiers } from "./lib/analytics";
 import { applySuggestedCompanies, type SuggestedCompany } from "./lib/buildSuggestions";
-import { diffRosters } from "./lib/changelog";
+import { computeTransfers, diffRosters } from "./lib/changelog";
 import {
   listRosters,
   getActiveRosterId,
@@ -431,7 +431,8 @@ function App() {
       window.alert("No changes since the last save.");
       return;
     }
-    const entry: ChangeLogEntry = { timestamp: new Date().toISOString(), changes };
+    const transfers = computeTransfers(baseline, roster);
+    const entry: ChangeLogEntry = { timestamp: new Date().toISOString(), changes, transfers };
     const updatedLog = [entry, ...changeLog];
     setChangeLog(updatedLog);
     saveChangeLog(rosterId, updatedLog);

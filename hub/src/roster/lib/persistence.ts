@@ -1,4 +1,5 @@
 import type { RosterData } from "../types/roster";
+import type { TransferPost } from "./changelog";
 
 const INDEX_KEY = "roster-manager:index";
 const ACTIVE_ID_KEY = "roster-manager:active-id";
@@ -19,6 +20,10 @@ function changeLogKey(id: string): string {
 export interface ChangeLogEntry {
   timestamp: string;
   changes: string[];
+  // Structured A→B moves from this same save, for "Copy as Transfer Post"
+  // (see changelog.ts computeTransfers()). Optional because entries saved
+  // before this field existed won't have it.
+  transfers?: TransferPost[];
 }
 
 export type RosterConfiguration = "old" | "new";

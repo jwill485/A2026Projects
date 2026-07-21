@@ -7,9 +7,22 @@ export interface LocationInfo {
   // Structural billet the soldier currently occupies — see SlotPath. Used
   // by leadership.ts to classify tier by billet rather than rank.
   kind: SlotPath["kind"];
+  // Raw structural fields behind `label`, for callers that need the pieces
+  // rather than the human-readable string — see slashPath()/billetPhrase()
+  // below, used by the Transfer Post generator. Unset battalion/platoon/
+  // squad fields mean "not applicable at this kind" (e.g. no platoon number
+  // for a company-level billet).
+  battalionDesignation: string;
+  companyLetter: string;
+  platoonNumber?: string;
+  squadNumber?: string;
 }
 
-function describeCompany(company: Company, map: Map<string, LocationInfo>): void {
+function describeCompany(
+  company: Company,
+  battalionDesignation: string,
+  map: Map<string, LocationInfo>,
+): void {
   const companyLabel =
     company.letter === "UNASSIGNED" ? "Unassigned" : `${company.name} (${company.letter})`;
   if (company.commander)
@@ -17,18 +30,24 @@ function describeCompany(company: Company, map: Map<string, LocationInfo>): void
       label: `${companyLabel} — Commander`,
       soldier: company.commander,
       kind: "companyCommander",
+      battalionDesignation,
+      companyLetter: company.letter,
     });
   if (company.executiveOfficer)
     map.set(company.executiveOfficer.userId, {
       label: `${companyLabel} — Executive Officer`,
       soldier: company.executiveOfficer,
       kind: "companyXO",
+      battalionDesignation,
+      companyLetter: company.letter,
     });
   if (company.firstSergeant)
     map.set(company.firstSergeant.userId, {
       label: `${companyLabel} — First Sergeant`,
       soldier: company.firstSergeant,
       kind: "company1SG",
+      battalionDesignation,
+      companyLetter: company.letter,
     });
   for (const platoon of company.platoons) {
     if (platoon.leader)
@@ -36,12 +55,18 @@ function describeCompany(company: Company, map: Map<string, LocationInfo>): void
         label: `${companyLabel} — Platoon ${platoon.number} Leader`,
         soldier: platoon.leader,
         kind: "platoonLeader",
+        battalionDesignation,
+        companyLetter: company.letter,
+        platoonNumber: platoon.number,
       });
     if (platoon.sergeant)
       map.set(platoon.sergeant.userId, {
         label: `${companyLabel} — Platoon ${platoon.number} Sergeant`,
         soldier: platoon.sergeant,
         kind: "platoonSergeant",
+        battalionDesignation,
+        companyLetter: company.letter,
+        platoonNumber: platoon.number,
       });
     for (const squad of platoon.squads) {
       if (squad.leader)
@@ -49,18 +74,30 @@ function describeCompany(company: Company, map: Map<string, LocationInfo>): void
           label: `${companyLabel} — Platoon ${platoon.number} / Squad ${squad.number} Leader`,
           soldier: squad.leader,
           kind: "squadLeader",
+          battalionDesignation,
+          companyLetter: company.letter,
+          platoonNumber: platoon.number,
+          squadNumber: squad.number,
         });
       if (squad.assistantLeader)
         map.set(squad.assistantLeader.userId, {
           label: `${companyLabel} — Platoon ${platoon.number} / Squad ${squad.number} Assistant Leader`,
           soldier: squad.assistantLeader,
           kind: "squadAssistantLeader",
+          battalionDesignation,
+          companyLetter: company.letter,
+          platoonNumber: platoon.number,
+          squadNumber: squad.number,
         });
       for (const member of squad.members) {
         map.set(member.userId, {
           label: `${companyLabel} — Platoon ${platoon.number} / Squad ${squad.number} Member`,
           soldier: member,
           kind: "squadMember",
+          battalionDesignation,
+          companyLetter: company.letter,
+          platoonNumber: platoon.number,
+          squadNumber: squad.number,
         });
       }
     }
@@ -69,26 +106,33 @@ function describeCompany(company: Company, map: Map<string, LocationInfo>): void
 
 export function describeSoldierLocations(roster: RosterData): Map<string, LocationInfo> {
   const map = new Map<string, LocationInfo>();
+  const battalionDesignation = roster.battalion.designation;
   if (roster.battalion.commander)
     map.set(roster.battalion.commander.userId, {
       label: "Battalion HQ — Commander",
       soldier: roster.battalion.commander,
       kind: "battalionCommander",
+      battalionDesignation,
+      companyLetter: "HQ",
     });
   if (roster.battalion.executiveOfficer)
     map.set(roster.battalion.executiveOfficer.userId, {
       label: "Battalion HQ — Executive Officer",
       soldier: roster.battalion.executiveOfficer,
       kind: "battalionXO",
+      battalionDesignation,
+      companyLetter: "HQ",
     });
   if (roster.battalion.sergeantMajor)
     map.set(roster.battalion.sergeantMajor.userId, {
       label: "Battalion HQ — Sergeant Major",
       soldier: roster.battalion.sergeantMajor,
       kind: "battalionSGM",
+      battalionDesignation,
+      companyLetter: "HQ",
     });
-  for (const company of roster.battalion.companies) describeCompany(company, map);
-  describeCompany(roster.unassigned, map);
+  for (const company of roster.battalion.companies) describeCompany(company, battalionDesignation, map);
+  describeCompany(roster.unassigned, battalionDesignation, map);
   return map;
 }
 
@@ -134,4 +178,108 @@ export function diffRosters(baseline: RosterData, current: RosterData): string[]
     }
   }
   return lines.sort();
+}
+
+// Slash-path notation matching the live 7Cav position-title convention
+// (e.g. "Trooper 2/2/E/2-7") — platoon/squad/company/battalion, only as
+// many segments as the billet has. "Unassigned" isn't a real company, so
+// it gets a plain label instead of a path.
+function slashPath(loc: LocationInfo): string {
+  if (loc.companyLetter === "UNASSIGNED") return "Unassigned";
+  switch (loc.kind) {
+    case "battalionCommander":
+    case "battalionXO":
+    case "battalionSGM":
+      return loc.battalionDesignation;
+    case "companyCommander":
+    case "companyXO":
+    case "company1SG":
+      return `${loc.companyLetter}/${loc.battalionDesignation}`;
+    case "platoonLeader":
+    case "platoonSergeant":
+      return `${loc.platoonNumber}/${loc.companyLetter}/${loc.battalionDesignation}`;
+    case "squadLeader":
+    case "squadAssistantLeader":
+    case "squadMember":
+      return `${loc.platoonNumber}/${loc.squadNumber}/${loc.companyLetter}/${loc.battalionDesignation}`;
+    case "unassignedPool":
+      // Never actually produced by describeSoldierLocations (that kind is
+      // only used as a Drag & Drop pool drop-target marker elsewhere), but
+      // LocationInfo shares SlotPath's full kind union.
+      return "Unassigned";
+  }
+}
+
+// How a billet reads in "...Assigned to <path> as <phrase>". Deliberately
+// prose, not the raw position title (e.g. "the Squad Leader", not "Squad
+// Leader D/1/2/E/2-7").
+function billetPhrase(kind: SlotPath["kind"]): string {
+  switch (kind) {
+    case "battalionCommander":
+      return "the Battalion Commander";
+    case "battalionXO":
+      return "the Battalion Executive Officer";
+    case "battalionSGM":
+      return "the Battalion Sergeant Major";
+    case "companyCommander":
+      return "the Company Commander";
+    case "companyXO":
+      return "the Company Executive Officer";
+    case "company1SG":
+      return "the First Sergeant";
+    case "platoonLeader":
+      return "the Platoon Leader";
+    case "platoonSergeant":
+      return "the Platoon Sergeant";
+    case "squadLeader":
+      return "the Squad Leader";
+    case "squadAssistantLeader":
+      return "the Assistant Squad Leader";
+    case "squadMember":
+      return "a trooper";
+    case "unassignedPool":
+      return "unassigned";
+  }
+}
+
+export interface TransferPost {
+  soldier: Soldier;
+  fromPath: string;
+  toPath: string;
+  billetPhrase: string;
+}
+
+export function milpacsProfileUrl(userId: string): string {
+  return `https://7cav.us/rosters/profile/${userId}/`;
+}
+
+// Structured counterpart to diffRosters(), computed at the same moment
+// (baseline vs. current, at Save time) so it has access to full Soldier
+// records — Change Log entries only persist the formatted string lines,
+// not the rosters they came from, so this can't be reconstructed later.
+// Only covers actual A→B moves (matching "changed to a unit other than
+// their original") — new arrivals and removals have no clean "from"/"to"
+// and are left out.
+export function computeTransfers(baseline: RosterData, current: RosterData): TransferPost[] {
+  const before = describeSoldierLocations(baseline);
+  const after = describeSoldierLocations(current);
+  const transfers: TransferPost[] = [];
+  for (const [id, a] of after) {
+    const b = before.get(id);
+    if (!b || b.label === a.label) continue;
+    transfers.push({
+      soldier: a.soldier,
+      fromPath: slashPath(b),
+      toPath: slashPath(a),
+      billetPhrase: billetPhrase(a.kind),
+    });
+  }
+  return transfers.sort((x, y) => x.soldier.realName.localeCompare(y.soldier.realName));
+}
+
+// BBCode, matching 7cav.us's XenForo post editor — paste directly into a
+// new thread/post.
+export function transferPostSentence(t: TransferPost): string {
+  const link = `[URL=${milpacsProfileUrl(t.soldier.userId)}]${t.soldier.username}[/URL]`;
+  return `${t.soldier.rankFull} ${link} is hereby Transferred from ${t.fromPath} and Assigned to ${t.toPath} as ${t.billetPhrase}, MOS ${t.soldier.mos}.`;
 }

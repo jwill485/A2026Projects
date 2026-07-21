@@ -1,3 +1,4 @@
+import { transferPostSentence } from "../lib/changelog";
 import type { ChangeLogEntry } from "../lib/persistence";
 import "./ChangeLogPanel.css";
 
@@ -33,6 +34,15 @@ export function ChangeLogPanel({
             <span>{new Date(entry.timestamp).toLocaleString()}</span>
             <span className="changelog-entry-actions">
               <button onClick={() => copyText(formatEntry(entry))}>Copy</button>
+              {entry.transfers && entry.transfers.length > 0 && (
+                <button
+                  onClick={() =>
+                    copyText(entry.transfers!.map(transferPostSentence).join("\n"))
+                  }
+                >
+                  Copy as Transfer Post
+                </button>
+              )}
               <button onClick={() => onDeleteEntry(entry.timestamp)}>Delete</button>
             </span>
           </div>
