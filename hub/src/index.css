@@ -106,6 +106,10 @@ body {
   margin-top: 0;
 }
 
+.error {
+  color: var(--danger);
+}
+
 .home-cards {
   display: flex;
   gap: 1rem;

@@ -1,11 +1,13 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import patchEmblem from "./assets/1cd-patch.png";
 import GradsApp from "./grads/GradsApp";
+import ProjectsApp from "./projects/ProjectsApp";
 import RosterApp from "./roster/RosterApp";
 
 const NAV_ITEMS = [
   { to: "/roster", label: "Roster Manager" },
   { to: "/grads", label: "Course Graduations" },
+  { to: "/projects", label: "Unit Projects" },
 ];
 
 function Home() {
@@ -47,6 +49,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/roster/*" element={<RosterApp />} />
           <Route path="/grads/*" element={<GradsApp />} />
+          <Route path="/projects/*" element={<ProjectsApp />} />
         </Routes>
       </main>
     </div>

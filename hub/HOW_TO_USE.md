@@ -1,13 +1,14 @@
 # 7Cav Apps Hub — How to Use
 
-One page, one URL, both tools: Roster Manager and Course Graduations, side
-by side behind a shared nav. Each still talks to its own existing backend
-and data — this is a shared frontend shell, not a merged app.
+One page, one URL, three tools: Roster Manager, Course Graduations, and
+Unit Projects, side by side behind a shared nav. Each still talks to its
+own existing backend and data — this is a shared frontend shell, not a
+merged app.
 
 ## Running it locally
 
-You need **three terminal windows** open at the same time: one per backend,
-one for the hub frontend. Leave all three running while you use the app.
+You need **four terminal windows** open at the same time: one per backend,
+one for the hub frontend. Leave all four running while you use the app.
 
 **Terminal 1 — RosterManager backend (port 8000)**
 ```
@@ -25,48 +26,55 @@ cd "C:\Users\cskat\OneDrive\Desktop\7Cav\a2026Projects\class_grads\backend"
 .venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8001
 ```
 
-**Terminal 3 — hub frontend (port 5173)**
+**Terminal 3 — Unit Projects backend (port 8002)**
+```
+cd "C:\Users\cskat\OneDrive\Desktop\7Cav\a2026Projects\unit_projects\backend"
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8002
+```
+
+**Terminal 4 — hub frontend (port 5173)**
 ```
 cd "C:\Users\cskat\OneDrive\Desktop\7Cav\a2026Projects\hub"
 npm run dev
 ```
 
 Then open `http://localhost:5173` in your browser. Use the sidebar to
-switch between **Roster Manager** and **Course Graduations** — both stay
-mounted at their own URL (`/roster`, `/grads`) so bookmarks and the
-back/forward buttons work normally.
+switch between **Roster Manager**, **Course Graduations**, and
+**Unit Projects** — each stays mounted at its own URL (`/roster`, `/grads`,
+`/projects`) so bookmarks and the back/forward buttons work normally.
 
-**When you're done**, close all three terminal windows (or `Ctrl+C` in
+**When you're done**, close all four terminal windows (or `Ctrl+C` in
 each).
 
-## Why two backends and one frontend
+## Why separate backends and one frontend
 
 Roster Manager and Course Graduations were built as fully separate
 projects, each with its own FastAPI backend and its own data (Roster
 Manager's saved rosters/change logs live in the browser's local storage;
 Course Graduations' custom groups live in `class_grads/backend/data/`).
-The hub only unifies the **frontend** — a single React app with
-`react-router-dom` routes, each one rendering the other project's
-(otherwise-unmodified) UI code. Merging the backends/data into one service
-is a bigger future step, not done here — see
-`class_grads/class_grads_design_doc.md` §7.
+Unit Projects was scaffolded hub-only from the start (see its own design
+doc) but still keeps a separate backend, same reasoning. The hub only
+unifies the **frontend** — a single React app with `react-router-dom`
+routes, each one rendering the other projects' (otherwise-unmodified) UI
+code. Merging the backends/data into one service is a bigger future step,
+not done here — see `class_grads/class_grads_design_doc.md` §7.
 
 ## Troubleshooting
 
 - **A route shows "Failed to load" / "Failed to fetch"** — the matching
   backend terminal probably isn't running, or is running on the wrong
-  port. Roster Manager expects `8000`; Course Graduations expects `8001`
-  when run through the hub.
+  port. Roster Manager expects `8000`; Course Graduations expects `8001`;
+  Unit Projects expects `8002`.
 - **Port already in use** — on Windows, `uvicorn --reload` can leave an
   orphaned worker process behind if the parent is killed abruptly (Stop the
   parent, and its child survives holding the port). If a backend won't
-  bind, check `Get-NetTCPConnection -LocalPort 8000` (or 8001) for the
+  bind, check `Get-NetTCPConnection -LocalPort 8000` (or 8001/8002) for the
   owning PID and stop that specific process, not just the terminal you
   started it from.
-- **Are the old standalone frontends still there?** Yes —
-  `RosterManager/frontend` and `class_grads/frontend` still exist and still
-  work independently (each on their own backend port + `5173`), but the
-  hub is now the primary way to use both day to day.
+- **Are the old standalone frontends still there?** RosterManager and
+  class_grads' still exist and still work independently (each on their own
+  backend port + `5173`), but the hub is now the primary way to use them
+  day to day. Unit Projects has no standalone frontend at all — hub-only.
 
 ## Shared visual theme
 
