@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import patchEmblem from "./assets/1cd-patch.png";
+import { checkSession, SESSION_EXPIRED_EVENT } from "./auth";
 import GradsApp from "./grads/GradsApp";
+import { LoginScreen } from "./LoginScreen";
 import ProjectsApp from "./projects/ProjectsApp";
 import RosterApp from "./roster/RosterApp";
 
@@ -26,7 +29,23 @@ function Home() {
   );
 }
 
+type AuthState = "checking" | "required" | "ok";
+
 export default function App() {
+  const [authState, setAuthState] = useState<AuthState>("checking");
+
+  useEffect(() => {
+    checkSession().then((status) => {
+      setAuthState(status.authRequired && !status.valid ? "required" : "ok");
+    });
+    const onExpired = () => setAuthState("required");
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
+
+  if (authState === "checking") return null;
+  if (authState === "required") return <LoginScreen onSuccess={() => setAuthState("ok")} />;
+
   return (
     <div className="shell">
       <nav className="sidebar">

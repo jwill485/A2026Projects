@@ -3,8 +3,12 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+
+from .auth import AUTH_ENABLED, check_password, issue_token, require_session, session_status
 
 # .env lives at the repo root (two levels up from backend/app/)
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -25,9 +29,27 @@ app.add_middleware(
     # frontends all defaulting to 5173, Vite auto-increments (5174, 5175...)
     # whenever more than one is running locally at once.
     allow_origin_regex=r"http://localhost:517\d",
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+class LoginIn(BaseModel):
+    password: str
+
+
+@app.post("/api/login")
+async def login(body: LoginIn):
+    if not AUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="Auth is not enabled on this server")
+    if not check_password(body.password):
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    return {"token": issue_token()}
+
+
+@app.get("/api/session")
+async def session(authorization: Optional[str] = Header(None)):
+    return session_status(authorization)
 
 
 def _require_api_key() -> str:
@@ -53,17 +75,17 @@ async def _proxy_get(path: str) -> Response:
     )
 
 
-@app.get("/api/roster/{roster}")
+@app.get("/api/roster/{roster}", dependencies=[Depends(require_session)])
 async def get_roster(roster: str, lite: bool = True):
     suffix = "/lite" if lite else ""
     return await _proxy_get(f"/roster/{roster}{suffix}")
 
 
-@app.get("/api/awol")
+@app.get("/api/awol", dependencies=[Depends(require_session)])
 async def get_awol():
     return await _proxy_get("/milpacs/awol")
 
 
-@app.get("/api/ranks")
+@app.get("/api/ranks", dependencies=[Depends(require_session)])
 async def get_ranks():
     return await _proxy_get("/milpacs/ranks")

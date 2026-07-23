@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { authFetch } from "../auth";
 import "./grads.css";
 import { BATTALION_ORDER, COMPANY_LABELS, COMPANY_ORDER, TIER_LABELS, TIER_ORDER } from "./constants";
 import { GroupsPanel } from "./GroupsPanel";
@@ -179,11 +180,11 @@ export default function GradsApp() {
 
   const loadAll = useCallback(() => {
     return Promise.all([
-      fetch(`${BACKEND_URL}/api/graduations`).then((res) => {
+      authFetch(`${BACKEND_URL}/api/graduations`).then((res) => {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         return res.json();
       }),
-      fetch(`${BACKEND_URL}/api/groups`).then((res) => {
+      authFetch(`${BACKEND_URL}/api/groups`).then((res) => {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         return res.json();
       }),
@@ -198,7 +199,7 @@ export default function GradsApp() {
   }, [loadAll]);
 
   async function createGroup(name: string, requirements: GroupRequirement[]) {
-    await fetch(`${BACKEND_URL}/api/groups`, {
+    await authFetch(`${BACKEND_URL}/api/groups`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, requirements }),
@@ -207,7 +208,7 @@ export default function GradsApp() {
   }
 
   async function updateGroup(id: string, name: string, requirements: GroupRequirement[]) {
-    await fetch(`${BACKEND_URL}/api/groups/${id}`, {
+    await authFetch(`${BACKEND_URL}/api/groups/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, requirements }),
@@ -216,7 +217,7 @@ export default function GradsApp() {
   }
 
   async function deleteGroup(id: string) {
-    await fetch(`${BACKEND_URL}/api/groups/${id}`, { method: "DELETE" });
+    await authFetch(`${BACKEND_URL}/api/groups/${id}`, { method: "DELETE" });
     if (prereqId === id) setPrereqId(RANGER_ID);
     await loadAll();
   }

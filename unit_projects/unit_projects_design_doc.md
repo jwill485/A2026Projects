@@ -66,21 +66,21 @@ sync burden on day one.
 
 ## 3. Still open
 
-- **Owner linking to real troopers** — deferred at v1 (see §2.1). Would
-  need the same `MILPACS_API_KEY` + live roster pull pattern
-  RosterManager/class_grads use, and raises the same "shared domain logic"
-  question already flagged in class_grads' design doc §7 (three separate
-  position-title/scope implementations already exist).
-- **Auth** — same open item as the other two apps (see class_grads' design
-  doc §7) — more pressing here since projects are meant to be *edited* by
-  several different people, not just viewed.
-- **Category as a fixed set** — currently freeform, so nothing stops
-  typos/near-duplicates ("Recruiting" vs "recruiting drive") from
-  splitting the filter. Revisit if that becomes an actual problem in
-  practice rather than guessing now.
-- Nothing about the CSV-injection or Excel-date-coercion guards applied to
-  class_grads' exports has been considered here yet — this app doesn't
-  export CSV, but worth remembering if that's ever added.
+- ~~Auth~~ — done, 2026-07-22 (see class_grads' design doc §7 for the full
+  writeup, since it's built once and shared across all three backends).
+  Single shared password (`HUB_PASSWORD`), not per-user accounts — anyone
+  who's logged in can still edit/delete any project. No per-user
+  attribution; revisit if that becomes an actual need.
+- ~~CSV export~~ — done. Exports exactly what the table is showing (current
+  filter/search/sort), same `csvCell()`/`forceText()` guards against
+  formula injection and date auto-coercion as class_grads' exports.
+
+**Decided against (not being pursued):**
+- Owner linking to real troopers — staying free text. Not worth the
+  `MILPACS_API_KEY` + live roster pull integration for this app.
+- Category as a fixed set — staying freeform. Typo/near-duplicate risk
+  ("Recruiting" vs "recruiting drive") accepted rather than maintaining a
+  predefined list.
 
 ---
 

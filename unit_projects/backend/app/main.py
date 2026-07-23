@@ -1,13 +1,21 @@
 import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .auth import AUTH_ENABLED, check_password, issue_token, require_session, session_status
 from .projects_store import load_projects, save_projects
+
+# .env lives at the repo root (two levels up from backend/app/) -- matches
+# RosterManager's/class_grads' pattern, though this backend previously had
+# no env vars worth loading from a file.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 app = FastAPI(title="Unit Projects Backend")
 
@@ -25,6 +33,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class LoginIn(BaseModel):
+    password: str
+
+
+@app.post("/api/login")
+async def login(body: LoginIn):
+    if not AUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="Auth is not enabled on this server")
+    if not check_password(body.password):
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    return {"token": issue_token()}
+
+
+@app.get("/api/session")
+async def session(authorization: Optional[str] = Header(None)):
+    return session_status(authorization)
+
 
 Status = Literal["planning", "active", "complete", "shelved"]
 Priority = Literal["low", "medium", "high"]
@@ -46,12 +73,12 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-@app.get("/api/projects")
+@app.get("/api/projects", dependencies=[Depends(require_session)])
 async def list_projects() -> List[dict]:
     return load_projects()
 
 
-@app.post("/api/projects")
+@app.post("/api/projects", dependencies=[Depends(require_session)])
 async def create_project(project: ProjectIn) -> dict:
     projects = load_projects()
     now = _now()
@@ -66,7 +93,7 @@ async def create_project(project: ProjectIn) -> dict:
     return new_project
 
 
-@app.put("/api/projects/{project_id}")
+@app.put("/api/projects/{project_id}", dependencies=[Depends(require_session)])
 async def update_project(project_id: str, project: ProjectIn) -> dict:
     projects = load_projects()
     for i, existing in enumerate(projects):
@@ -82,7 +109,7 @@ async def update_project(project_id: str, project: ProjectIn) -> dict:
     raise HTTPException(status_code=404, detail="Project not found")
 
 
-@app.delete("/api/projects/{project_id}")
+@app.delete("/api/projects/{project_id}", dependencies=[Depends(require_session)])
 async def delete_project(project_id: str) -> dict:
     projects = load_projects()
     remaining = [p for p in projects if p["id"] != project_id]

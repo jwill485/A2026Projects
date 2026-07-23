@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { authFetch } from "../auth";
 import "./projects.css";
 import { PRIORITY_LABELS, PRIORITY_ORDER, STATUS_LABELS, STATUS_ORDER } from "./constants";
 import { ProjectEditor } from "./ProjectEditor";
@@ -35,6 +36,51 @@ function priorityBadgeClass(priority: Priority): string {
   return `priority-badge priority-${priority}`;
 }
 
+function csvEscape(value: string): string {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+// A leading apostrophe forces spreadsheet apps to treat a cell as plain
+// text (both hide the apostrophe itself). Needed for two different Excel/
+// Sheets quirks: (1) unconditionally, for values that could get silently
+// reformatted as dates, and (2) for any value starting with =, +, -, @,
+// tab, or CR, which spreadsheet apps may instead evaluate as a formula —
+// name/description/owner/category are free text entered by many people,
+// so this isn't just theoretical.
+function forceText(value: string): string {
+  return `'${value}`;
+}
+
+const FORMULA_INJECTION_RE = /^[=+\-@\t\r]/;
+
+function csvCell(value: string): string {
+  return FORMULA_INJECTION_RE.test(value) ? forceText(value) : value;
+}
+
+// Exports exactly what the table is showing — current filter/search/sort
+// order, one row per visible project.
+function exportVisibleToCsv(projects: Project[]) {
+  const headers = ["Name", "Status", "Priority", "Owner", "Category", "Target Date", "Description"];
+  const rows = projects.map((p) => [
+    csvCell(p.name),
+    STATUS_LABELS[p.status],
+    PRIORITY_LABELS[p.priority],
+    csvCell(p.owner),
+    csvCell(p.category),
+    p.targetDate ? forceText(p.targetDate) : "",
+    csvCell(p.description),
+  ]);
+  const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n") + "\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `7cav-unit-projects-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ProjectsApp() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +95,7 @@ export default function ProjectsApp() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const loadAll = useCallback(() => {
-    return fetch(`${BACKEND_URL}/api/projects`)
+    return authFetch(`${BACKEND_URL}/api/projects`)
       .then((res) => {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         return res.json();
@@ -62,7 +108,7 @@ export default function ProjectsApp() {
   }, [loadAll]);
 
   async function createProject(input: ProjectInput) {
-    await fetch(`${BACKEND_URL}/api/projects`, {
+    await authFetch(`${BACKEND_URL}/api/projects`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -72,7 +118,7 @@ export default function ProjectsApp() {
   }
 
   async function updateProject(id: string, input: ProjectInput) {
-    await fetch(`${BACKEND_URL}/api/projects/${id}`, {
+    await authFetch(`${BACKEND_URL}/api/projects/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -82,7 +128,7 @@ export default function ProjectsApp() {
   }
 
   async function deleteProject(id: string) {
-    await fetch(`${BACKEND_URL}/api/projects/${id}`, { method: "DELETE" });
+    await authFetch(`${BACKEND_URL}/api/projects/${id}`, { method: "DELETE" });
     setConfirmDeleteId(null);
     await loadAll();
   }
@@ -253,6 +299,10 @@ export default function ProjectsApp() {
                 Clear filters
               </button>
             )}
+
+            <button type="button" className="export-csv" onClick={() => exportVisibleToCsv(sorted)}>
+              Export CSV ({sorted.length})
+            </button>
 
             <button type="button" className="new-project-button" onClick={() => setEditorMode("new")}>
               + New Project

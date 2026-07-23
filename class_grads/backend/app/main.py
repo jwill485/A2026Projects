@@ -7,10 +7,11 @@ from typing import List, Optional
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .auth import AUTH_ENABLED, check_password, issue_token, require_session, session_status
 from .groups_store import load_groups, save_groups
 from .ranger import ranger_status
 
@@ -36,6 +37,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class LoginIn(BaseModel):
+    password: str
+
+
+@app.post("/api/login")
+async def login(body: LoginIn):
+    if not AUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="Auth is not enabled on this server")
+    if not check_password(body.password):
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    return {"token": issue_token()}
+
+
+@app.get("/api/session")
+async def session(authorization: Optional[str] = Header(None)):
+    return session_status(authorization)
 
 # Mirrors the position-title patterns RosterManager uses (buildRoster.ts),
 # widened to cover the whole regiment rather than just 2-7. In scope: the
@@ -230,12 +249,12 @@ def compute_group_status(graduations: List[dict], group: dict) -> dict:
     }
 
 
-@app.get("/api/groups")
+@app.get("/api/groups", dependencies=[Depends(require_session)])
 async def get_groups():
     return load_groups()
 
 
-@app.post("/api/groups")
+@app.post("/api/groups", dependencies=[Depends(require_session)])
 async def create_group(group: GroupIn):
     groups = load_groups()
     new_group = {
@@ -248,7 +267,7 @@ async def create_group(group: GroupIn):
     return new_group
 
 
-@app.put("/api/groups/{group_id}")
+@app.put("/api/groups/{group_id}", dependencies=[Depends(require_session)])
 async def update_group(group_id: str, group: GroupIn):
     groups = load_groups()
     for g in groups:
@@ -260,7 +279,7 @@ async def update_group(group_id: str, group: GroupIn):
     raise HTTPException(status_code=404, detail="Group not found")
 
 
-@app.delete("/api/groups/{group_id}")
+@app.delete("/api/groups/{group_id}", dependencies=[Depends(require_session)])
 async def delete_group(group_id: str):
     groups = load_groups()
     remaining = [g for g in groups if g["id"] != group_id]
@@ -270,7 +289,7 @@ async def delete_group(group_id: str):
     return {"deleted": group_id}
 
 
-@app.get("/api/graduations")
+@app.get("/api/graduations", dependencies=[Depends(require_session)])
 async def get_graduations():
     api_key = _require_api_key()
     async with httpx.AsyncClient(timeout=30.0) as client:

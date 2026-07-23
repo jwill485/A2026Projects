@@ -233,10 +233,11 @@ view, not a full snapshot). Doesn't require the backend running.
   officer/seniorNco/juniorNco/trooper rank-order cutoffs in
   `_tier_from_rank_order` land where leadership would expect for warrant
   officers and "1IC/2IC/Lead" roles specifically.
-- `backend/data/groups.json` is a single unguarded file with no auth on the
-  `/api/groups` write endpoints — fine for one trusted local user, not fine
-  if this ever runs somewhere multiple people can reach it unauthenticated.
-  Worth revisiting alongside [§7](#7-broader-vision-unit-management-app).
+- ~~`backend/data/groups.json` is a single unguarded file with no auth on
+  the `/api/groups` write endpoints~~ — resolved 2026-07-22, see
+  [§7](#7-broader-vision-unit-management-app): `/api/groups` (like every
+  other write endpoint across all three backends) now sits behind the
+  shared-password login gate when `HUB_PASSWORD`/`SESSION_SECRET` are set.
 
 ## 6. Planned / Future Ideas
 
@@ -293,24 +294,95 @@ auto-increment can land on 5174/5175/etc.
 
 Still open, now that the frontend piece is done:
 
-- **Merge vs. stay composed.** The hub proves composing works for the UI
-  layer; a full merge (one FastAPI backend exposing both roster-management
-  and class-tracking endpoints, one shared data model) is still a bigger,
-  separate step — not started.
-- **Auth**, if this ever serves more than one trusted person on one
-  machine — right now neither backend has any (RosterManager's `.env` even
-  has an unused `JWT_SECRET`, suggesting this was anticipated, and its
-  `multi-user-auth` git branch has an unmerged JWT scaffold). Directly
-  relevant to the `groups.json` write-endpoint concern in
-  [§5](#5-open-follow-ups-from-this-round). Production auth/routing would
-  sit behind a reverse proxy mapping clean paths to each backend — unrelated
-  to today's local dev-port choice.
-- **Shared domain logic.** Both projects independently derive
-  battalion/company/tier from `positionTitle` regexes (RosterManager's
-  `buildRoster.ts`, class_grads' `main.py` + `scope.ts`) — three
-  implementations of the same rules today, and mounting them side by side
-  in the hub didn't change that. A real merge would want one shared source
-  of truth instead of three copies kept manually in sync by convention.
+- **Merge vs. stay composed — decided 2026-07-21: stay composed, no shared
+  backend code.** Scoped by inventorying all three backends (RosterManager,
+  class_grads, unit_projects) factually before deciding (see §7.1 for the
+  findings). The deciding factor was deployment: `DEPLOY.md` deploys each
+  backend as an **independent Render Web Service**, each with its own
+  **Root Directory** (`RosterManager/backend`, `class_grads/backend`,
+  `unit_projects/backend`). Any code shared *across* those directories
+  (e.g. a top-level `shared/` package) stops being a clean `pip install -r
+  requirements.txt` from that Root Directory — it would need extra build
+  steps, `PYTHONPATH` hacks, or widening each service's Root Directory to
+  the repo root, all of which trade real deploy simplicity for saving a
+  couple dozen duplicated lines. Not worth it for a small trusted-audience
+  tool. So: `groups_store.py`/`projects_store.py` stay independently
+  duplicated (they're tiny), and RosterManager's `buildRoster.ts` stays
+  frontend-only and 2-7-scoped rather than getting a ported
+  `classify_position()` equivalent — see §7.1 for why that's the right
+  call even setting deployment aside.
+
+### 7.1 Merge scoping findings (2026-07-21)
+
+- **RosterManager** (8000) is a thin, read-only 7cav API proxy — no
+  Pydantic models, no server-side persistence, no classification logic in
+  the backend at all. Its `Soldier` type and battalion/company
+  classification (`buildRoster.ts`) live entirely in the frontend, hardcoded
+  to battalion 2-7, and shape data as a nested org-chart tree
+  (Battalion→Company→Platoon→Squad) because that's what split-planning/drag-drop
+  needs. This 2-7 scoping is a deliberate design choice (it's the unit's own
+  planning tool), not an oversight to "fix" by widening it — nothing about
+  it needs to track class_grads' regiment-wide rules.
+- **class_grads** (8001) does a live, opinionated pull+join
+  (`ROSTER_TYPE_COMBAT` + ranks) and classifies server-side via
+  `classify_position()`, regiment-wide, into a **flat** record (explicit
+  `battalion`/`company`/`tier`/`echelon` fields) because it needs to
+  filter/group across the whole regiment.
+- **unit_projects** (8002) has zero 7cav API dependency and zero overlap
+  with the other two beyond boilerplate — no person/soldier concept at all,
+  `owner` is a free-text string, not linked to any roster ID.
+- The regex classification logic is **similar but diverged, not shared** —
+  class_grads' Python regexes were deliberately written to mirror
+  RosterManager's TS ones (per class_grads' own source comment), then
+  independently widened regiment-wide. Two hand-maintained implementations
+  in two different languages (frontend TS vs. backend Python) serving two
+  genuinely different scopes (one battalion vs. the whole regiment) — not
+  one duplicated file with an accidental fork.
+- `groups_store.py` (class_grads) and `projects_store.py` (unit_projects)
+  **are** near-identical duplicated boilerplate — same whole-file JSON
+  read/write shape, just renamed. Real duplication, but each is ~18 lines
+  and each backend deploys from its own isolated Render Root Directory (see
+  above) — extracting a shared module would cost more in deploy complexity
+  than the duplication itself costs in maintenance.
+- CORS, `requirements.txt` versions, and the `MILPACS_API_KEY`/
+  `MILPACS_BASE_URL` pattern (where used) are already fully consistent
+  across all three — no drift found there, nothing to do.
+
+**Decision: no backend/data-model merge, no cross-service shared code
+module.** RosterManager's tree-shaped model and class_grads' flat
+regiment-wide model each fit their own app's actual UI and actual scope;
+unit_projects has nothing to merge in; and Render's per-service Root
+Directory deploy model makes cross-service code sharing a net cost, not a
+saving, at this project's size. Revisit only if a service ever needs
+logic genuinely identical to another's *and* deployment moves off this
+per-directory Render model (e.g. a single monolith deploy or a published
+internal package) — neither is true today.
+
+- ~~Auth~~ — built 2026-07-22, ahead of the first deployed demo. Single
+  shared password (`HUB_PASSWORD`), not per-user accounts — the earlier
+  "tabled unless a future update makes it critical" note (2026-07-21)
+  turned out to be immediately critical, since deploying anything publicly
+  needed *some* gate first. Design: each backend gets a small duplicated
+  `auth.py` (`RosterManager/backend/app/auth.py`, and identically in
+  class_grads' and unit_projects'), consistent with the "duplicate rather
+  than share across Render's per-service Root Directories" call made
+  above. `/api/login` checks the password and issues a stateless
+  HMAC-signed token (`{expiry}.{hmac_sha256(SESSION_SECRET, expiry)}`,
+  7-day TTL); a `require_session` FastAPI dependency guards every other
+  route; `/api/session` lets the hub check token validity without hitting
+  a protected route. Because verification only needs the shared
+  `SESSION_SECRET` (no shared database or cross-service call), a token
+  issued by any one backend is accepted by all three. **Opt-in**: if
+  `HUB_PASSWORD`/`SESSION_SECRET` aren't set (the local-dev default), auth
+  is fully disabled and every route behaves exactly as before this existed
+  — verified via Playwright in both states. The hub (`hub/src/auth.ts`,
+  `LoginScreen.tsx`) gates the whole shell behind a login screen and
+  attaches the session token to every API call via an `authFetch` wrapper
+  used in `roster/lib/api.ts`, `GradsApp.tsx`, and `ProjectsApp.tsx`. Not
+  pursued: per-user accounts/attribution, rate-limiting or lockout on
+  `/api/login` — fine for a small trusted-audience demo, revisit if that
+  changes. See `DEPLOY.md` and `hub/HOW_TO_USE.md` for the operational
+  setup (env vars, testing the gate locally).
 - **What RosterManager gets from this direction**: a live class-completion
   view alongside its roster/split-planning tools. **What class_grads gets**:
   RosterManager's multi-roster/planning concepts, if qualification tracking

@@ -46,6 +46,19 @@ switch between **Roster Manager**, **Course Graduations**, and
 **When you're done**, close all four terminal windows (or `Ctrl+C` in
 each).
 
+## Login (only if `HUB_PASSWORD` is set)
+
+The hub can sit behind a single shared password — see `../DEPLOY.md` for
+the deployed setup. Locally, none of the three backends' `.env` files set
+`HUB_PASSWORD`/`SESSION_SECRET` by default, so the app opens straight to
+the sidebar with no login prompt, exactly as before this existed. To test
+the login flow locally, add matching `HUB_PASSWORD=`/`SESSION_SECRET=`
+lines to all three `.env` files (`RosterManager/.env`, `class_grads/.env`,
+`unit_projects/.env`) with **identical values in each** — the login gate
+is stateless, so any one of the three backends can issue a session token
+and all three independently verify it against the same `SESSION_SECRET`.
+Restart the backends after changing `.env`.
+
 ## Why separate backends and one frontend
 
 Roster Manager and Course Graduations were built as fully separate
@@ -71,6 +84,13 @@ not done here — see `class_grads/class_grads_design_doc.md` §7.
   bind, check `Get-NetTCPConnection -LocalPort 8000` (or 8001/8002) for the
   owning PID and stop that specific process, not just the terminal you
   started it from.
+- **Stuck on the login screen even with the right password, or seeing 401s
+  after it worked before** — if `HUB_PASSWORD`/`SESSION_SECRET` is set
+  locally and you change `SESSION_SECRET` (or restart a backend with a
+  different value than the others), previously-issued tokens stop
+  verifying. Clear the stored token (`localStorage.removeItem("hub:session-token")`
+  in the browser console, or just log in again) and make sure all three
+  `.env` files have the exact same `SESSION_SECRET`.
 - **Are the old standalone frontends still there?** RosterManager and
   class_grads' still exist and still work independently (each on their own
   backend port + `5173`), but the hub is now the primary way to use them
