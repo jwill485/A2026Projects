@@ -297,20 +297,27 @@ Still open, now that the frontend piece is done:
 - **Merge vs. stay composed — decided 2026-07-21: stay composed, no shared
   backend code.** Scoped by inventorying all three backends (RosterManager,
   class_grads, unit_projects) factually before deciding (see §7.1 for the
-  findings). The deciding factor was deployment: `DEPLOY.md` deploys each
-  backend as an **independent Render Web Service**, each with its own
-  **Root Directory** (`RosterManager/backend`, `class_grads/backend`,
-  `unit_projects/backend`). Any code shared *across* those directories
-  (e.g. a top-level `shared/` package) stops being a clean `pip install -r
-  requirements.txt` from that Root Directory — it would need extra build
-  steps, `PYTHONPATH` hacks, or widening each service's Root Directory to
-  the repo root, all of which trade real deploy simplicity for saving a
-  couple dozen duplicated lines. Not worth it for a small trusted-audience
-  tool. So: `groups_store.py`/`projects_store.py` stay independently
-  duplicated (they're tiny), and RosterManager's `buildRoster.ts` stays
-  frontend-only and 2-7-scoped rather than getting a ported
-  `classify_position()` equivalent — see §7.1 for why that's the right
-  call even setting deployment aside.
+  findings). The deciding factor at the time was deployment: the original
+  plan deployed each backend as an **independent Render Web Service**, each
+  with its own **Root Directory** (`RosterManager/backend`,
+  `class_grads/backend`, `unit_projects/backend`). Any code shared *across*
+  those directories (e.g. a top-level `shared/` package) stops being a
+  clean `pip install -r requirements.txt` from that Root Directory — it
+  would need extra build steps, `PYTHONPATH` hacks, or widening each
+  service's Root Directory to the repo root, all of which trade real
+  deploy simplicity for saving a couple dozen duplicated lines. Not worth
+  it for a small trusted-audience tool. So: `groups_store.py`/
+  `projects_store.py` stay independently duplicated (they're tiny), and
+  RosterManager's `buildRoster.ts` stays frontend-only and 2-7-scoped
+  rather than getting a ported `classify_position()` equivalent — see §7.1
+  for why that's the right call even setting deployment aside.
+  **Update 2026-07-24**: the plan to deploy on Render was dropped —
+  hosting is moving to a regiment-owned server instead, managed by S6
+  Development Staff (see `INTEGRATION.md`). The Render-specific reasoning
+  above is now historical context, not the live constraint; whether it
+  still holds depends on how S6 actually hosts these services (separate
+  processes vs. something that would make shared code easy again) —
+  revisit once that's known rather than assuming either way.
 
 ### 7.1 Merge scoping findings (2026-07-21)
 
@@ -381,8 +388,8 @@ internal package) — neither is true today.
   used in `roster/lib/api.ts`, `GradsApp.tsx`, and `ProjectsApp.tsx`. Not
   pursued: per-user accounts/attribution, rate-limiting or lockout on
   `/api/login` — fine for a small trusted-audience demo, revisit if that
-  changes. See `DEPLOY.md` and `hub/HOW_TO_USE.md` for the operational
-  setup (env vars, testing the gate locally).
+  changes. See `INTEGRATION.md` and `hub/HOW_TO_USE.md` for the
+  operational setup (env vars, testing the gate locally).
 - **What RosterManager gets from this direction**: a live class-completion
   view alongside its roster/split-planning tools. **What class_grads gets**:
   RosterManager's multi-roster/planning concepts, if qualification tracking

@@ -30,8 +30,8 @@ sync burden on day one.
   persistence, mirroring class_grads' `groups_store.py`/`groups.json`
   exactly: plain JSON file, read/written on every CRUD call, gitignored
   (local instance data, not source). Same known tradeoff: fine for one
-  trusted small group, no concurrent-write safety, and no persistent disk
-  if ever deployed to Render's free tier (see `DEPLOY.md`).
+  trusted small group, no concurrent-write safety, and needs a persistent
+  path/volume wherever this ends up hosted (see `INTEGRATION.md`).
 - **`hub/src/projects/`**:
   - `types.ts` — `Project`/`ProjectInput`/`Status`/`Priority`.
   - `constants.ts` — status/priority display order and labels.

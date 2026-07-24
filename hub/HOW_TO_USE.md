@@ -48,8 +48,8 @@ each).
 
 ## Login (only if `HUB_PASSWORD` is set)
 
-The hub can sit behind a single shared password — see `../DEPLOY.md` for
-the deployed setup. Locally, none of the three backends' `.env` files set
+The hub can sit behind a single shared password — see `../INTEGRATION.md`
+for the deployed setup. Locally, none of the three backends' `.env` files set
 `HUB_PASSWORD`/`SESSION_SECRET` by default, so the app opens straight to
 the sidebar with no login prompt, exactly as before this existed. To test
 the login flow locally, add matching `HUB_PASSWORD=`/`SESSION_SECRET=`
