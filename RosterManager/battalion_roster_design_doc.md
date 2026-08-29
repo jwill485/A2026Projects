@@ -233,13 +233,19 @@ stays usable throughout:
    dropdown (see [§2.12](#212-search--filter)) pre-set to Neutral, turning
    the tree into a work queue — troopers drop out of view as they're tagged.
    Tags can also be bulk-applied from a file via **Import tags from CSV…**
-   on the same phase card (`splitTagImport.ts`): two columns per line —
-   trooper, then `N`/`HLLV`/`HLLWW2` — split on comma/semicolon/tab, extra
-   columns ignored, a non-matching first line skipped as a header. Troopers
-   are matched by username first (the unique MILPACS handle), then by real
-   name as a fallback; a real name shared by several troopers is skipped as
-   ambiguous rather than guessed at. An inline summary reports applied /
-   not-found / ambiguous / unreadable lines. A **🎲 Random tags (test)**
+   on the same phase card (`splitTagImport.ts`), built against the actual
+   shape of the reorg survey export rather than a clean two-column file:
+   trooper name in the first column — plain (`Cameron.J`) or, as the survey
+   exports it, rank-prefixed (`Pfc.Melon.DJ`, matched by trying the name both
+   with and without its leading `Rank.` segment) — then a tag anywhere in
+   the remaining columns (so an extra "Section" column, as the survey has,
+   doesn't need to be stripped first), either short (`N`/`HLLV`/`HLLWW2`) or
+   spelled out (`Hell Let Loose Vietnam`/`Hell Let Loose WW2`). Split on
+   comma/semicolon/tab; a non-matching first line is skipped as a header.
+   Troopers are matched by username first (the unique MILPACS handle), then
+   by real name as a fallback; a real name shared by several troopers is
+   skipped as ambiguous rather than guessed at. An inline summary reports
+   applied / not-found / ambiguous / unreadable lines. A **🎲 Random tags (test)**
    button (confirm-gated, since it overwrites every tag) coin-flips
    everyone onto HLLV or HLLWW2 — a test helper for exercising the later
    phases without doing the real sort first. A per-company **intact
@@ -277,10 +283,12 @@ stays usable throughout:
    specialty — intact.
 3. **Review leadership** — the planner buckets each battalion's tagged pool
    into **Officers / Senior NCOs / Junior NCOs / Troopers** (classified by
-   rank in `leadership.ts`), each annotated with the billets that tier
-   feeds (officers → CO/XO/PL, senior NCOs → SGM/1SG/PSG, junior NCOs →
-   Squad Leader). A zero in a leadership tier is flagged red — the cue to
-   re-balance tags before committing. Ends with an explicit **Accept
+   billet in `leadership.ts`), each row showing the distinct ranks actually
+   tagged into it (e.g. "CPT, 1LT"), most senior first, rather than a static
+   list of the billets that tier is meant to feed — so a lopsided sort (all
+   2LTs, no CPTs) is visible at a glance instead of implied only by a
+   headcount (`tierRankSummary`). A zero in a leadership tier is flagged
+   red — the cue to re-balance tags before committing. Ends with an explicit **Accept
    leadership review** button (`RosterData.leadershipAccepted`); changing
    anyone's split tag afterwards — toggle, CSV import, or the random-tag
    test button — clears the acceptance, since the review no longer

@@ -20,13 +20,20 @@ export const TIER_LABELS: Record<LeadershipTier, string> = {
   trooper: "Troopers",
 };
 
-// What each tier is the candidate pool for, shown as a planning hint.
-export const TIER_BILLETS: Record<LeadershipTier, string> = {
-  officer: "BN CO/XO, Company CO/XO, Platoon Leader",
-  seniorNco: "SGM, 1SG, Platoon Sergeant",
-  juniorNco: "Squad Leader, Assistant Squad Leader",
-  trooper: "Squad members",
-};
+// Distinct rank labels actually tagged into a tier, most senior first —
+// shown next to the tier instead of a static "what billets this tier feeds"
+// hint, so a lopsided tag job (e.g. every officer is a 2LT, no CPTs) is
+// visible at a glance rather than implied only by a headcount.
+export function tierRankSummary(soldiers: Soldier[], rankOrder: Map<string, number>): string {
+  const seen = new Map<string, number>();
+  for (const s of soldiers) {
+    if (!seen.has(s.rankShort)) seen.set(s.rankShort, rankOrder.get(s.rankId) ?? Number.MAX_SAFE_INTEGER);
+  }
+  return [...seen.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .map(([label]) => label)
+    .join(", ");
+}
 
 // Which tier a given structural billet counts as. Anyone not currently
 // occupying one of the leadership slots below (squad members, the pool)

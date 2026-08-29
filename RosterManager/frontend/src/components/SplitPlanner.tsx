@@ -8,7 +8,7 @@ import {
   computeLeadershipFillByCompany,
   computeSquadMos,
 } from "../lib/analytics";
-import { bucketByTier, TIER_BILLETS, TIER_LABELS, TIER_ORDER } from "../lib/leadership";
+import { bucketByTier, TIER_LABELS, TIER_ORDER, tierRankSummary } from "../lib/leadership";
 import { CHARLIE_LETTER, intactExcludedLetters, SPLIT_GROUPS } from "../lib/splitReorg";
 import { suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
 import { parseSplitTagCsv, type SplitTagImportResult, type SplitTagRow } from "../lib/splitTagImport";
@@ -22,7 +22,15 @@ function PhaseChip({ state }: { state: PhaseState }) {
   return <span className={`phase-chip phase-chip-${state}`}>{label}</span>;
 }
 
-function TierList({ roster, soldiers }: { roster: RosterData; soldiers: Soldier[] }) {
+function TierList({
+  roster,
+  soldiers,
+  rankOrder,
+}: {
+  roster: RosterData;
+  soldiers: Soldier[];
+  rankOrder: Map<string, number>;
+}) {
   // bucketByTier walks the whole roster tree — memoized so it only re-runs
   // when this group's tagged membership or the roster itself changes, not
   // on every unrelated re-render (e.g. typing in a search box elsewhere).
@@ -36,7 +44,7 @@ function TierList({ roster, soldiers }: { roster: RosterData; soldiers: Soldier[
             <span className={`tier-count${tier !== "trooper" && buckets[tier].length === 0 ? " tier-count-zero" : ""}`}>
               {buckets[tier].length}
             </span>
-            <span className="tier-billets">{TIER_BILLETS[tier]}</span>
+            <span className="tier-ranks">{tierRankSummary(buckets[tier], rankOrder)}</span>
           </summary>
           <ul>
             {buckets[tier].map((s) => (
@@ -85,6 +93,7 @@ export function SplitPlanner({
   roster,
   rosterList,
   activeConfiguration,
+  rankOrder,
   loadRosterData,
   onCommitSplit,
   onOpenRoster,
@@ -102,6 +111,7 @@ export function SplitPlanner({
   roster: RosterData;
   rosterList: RosterSummary[];
   activeConfiguration?: "old" | "new";
+  rankOrder: Map<string, number>;
   loadRosterData: (id: string) => RosterData | null;
   onCommitSplit: () => void;
   onOpenRoster: (id: string) => void;
@@ -126,7 +136,7 @@ export function SplitPlanner({
       const lines: string[] = [];
       if (rows.length === 0) {
         lines.push(
-          "No usable lines found. Expected two columns per line: trooper (username or real name), then N, HLLV, or HLLWW2.",
+          'No usable lines found. Expected a trooper name (username, real name, or "Rank.Last.F") in the first column, plus a tag — N, HLLV, HLLWW2, or spelled out ("Hell Let Loose Vietnam"/"Hell Let Loose WW2") — somewhere in the rest of the row.',
         );
       } else {
         const result = onImportSplitTags(rows);
@@ -290,7 +300,11 @@ export function SplitPlanner({
                 Start sorting ({neutralCount} to go) →
               </button>
             )}
-            <button className="add-btn" onClick={() => fileInputRef.current?.click()}>
+            <button
+              className="add-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title='Name column can be "Last.F" or "Rank.Last.F"; tag column can be N/HLLV/HLLWW2 or the spelled-out game name, in any column after the name'
+            >
               Import tags from CSV…
             </button>
             <button
@@ -467,7 +481,7 @@ export function SplitPlanner({
                 {g.name} <span className="group-headcount">{g.members.length} tagged</span>
               </h4>
               {g.members.length > 0 ? (
-                <TierList roster={roster} soldiers={g.members} />
+                <TierList roster={roster} soldiers={g.members} rankOrder={rankOrder} />
               ) : (
                 <p className="tier-empty">Nobody tagged for {g.name} yet.</p>
               )}

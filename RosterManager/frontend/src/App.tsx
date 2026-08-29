@@ -625,6 +625,7 @@ function App() {
           roster={roster}
           rosterList={rosterList}
           activeConfiguration={activeConfiguration}
+          rankOrder={rankOrder}
           loadRosterData={loadRoster}
           onCommitSplit={handleCommitSplit}
           onOpenRoster={handleOpenRosterBuild}
