@@ -1,4 +1,4 @@
-import type { Company, IntactTransfer, RosterData, Soldier, SplitStatus } from "../types/roster";
+import type { Battalion, Company, IntactTransfer, Platoon, RosterData, Soldier, SplitStatus } from "../types/roster";
 import { makeBattalion, makeCompany } from "./rosterFactory";
 import { collectAllSoldiers, collectCompanySoldiers } from "./analytics";
 import { describeSoldierLocations } from "./changelog";
@@ -142,4 +142,191 @@ export function intactExcludedLetters(roster: RosterData, status: SplitStatus): 
     .map((t) => t.letter);
   if (letters.includes(CHARLIE_LETTER)) letters.push(roster.unassigned.letter);
   return letters;
+}
+
+// Company letter -> the status an intact transfer forces on everyone in it,
+// overriding their personal tag (same precedent as collectIntactCompanies
+// above). Charlie's transfer also covers the Unassigned pool, since B/ACD
+// currently holds Charlie's real people (see CHARLIE_LETTER).
+function buildIntactStatusMap(intactTransfers: IntactTransfer[]): Map<string, SplitStatus> {
+  const map = new Map<string, SplitStatus>();
+  for (const transfer of intactTransfers) map.set(transfer.letter, transfer.status);
+  const charlieStatus = map.get(CHARLIE_LETTER);
+  if (charlieStatus) map.set("UNASSIGNED", charlieStatus);
+  return map;
+}
+
+// Builds a new battalion roster for HLLV by mirroring the source roster's
+// actual current structure wholesale, rather than flattening everyone into
+// an empty pool the way buildSplitRoster does for HLLWW2. HLLV inherits
+// almost all of 2-7 as-is; only the minority leaving for HLLWW2 should
+// create any visible change, so the whole tree is cloned and only the
+// billets held by people *not* staying get vacated in place. Combined with
+// Commit Split's baseline-saved-identical-to-built behavior, this means
+// nobody who keeps their billet ever shows up as a "change" — only someone
+// later moved into (or out of) a billet does, via the existing
+// diffRosters/computeTransfers machinery in changelog.ts.
+export function buildMirroredRoster(
+  source: RosterData,
+  status: SplitStatus,
+  designation: string,
+  intactTransfers: IntactTransfer[] = [],
+): RosterData {
+  const battalion: Battalion = structuredClone(source.battalion);
+  battalion.designation = designation;
+  const unassigned: Company = structuredClone(source.unassigned);
+
+  const intactByLetter = buildIntactStatusMap(intactTransfers);
+  // A company's intact-transfer status overrides every member's personal
+  // tag; absent one, a soldier keeps their own tag. Battalion HQ has no
+  // company letter, so "" never matches an intact transfer and this always
+  // falls through to the soldier's own tag there.
+  function keeps(soldier: Soldier, companyLetter: string): boolean {
+    const effective = intactByLetter.get(companyLetter) ?? soldier.splitStatus ?? "neutral";
+    return effective === status;
+  }
+
+  function vacateCompany(company: Company): void {
+    if (company.commander && !keeps(company.commander, company.letter)) company.commander = null;
+    if (company.executiveOfficer && !keeps(company.executiveOfficer, company.letter)) {
+      company.executiveOfficer = null;
+    }
+    if (company.firstSergeant && !keeps(company.firstSergeant, company.letter)) company.firstSergeant = null;
+    for (const platoon of company.platoons) {
+      if (platoon.leader && !keeps(platoon.leader, company.letter)) platoon.leader = null;
+      if (platoon.sergeant && !keeps(platoon.sergeant, company.letter)) platoon.sergeant = null;
+      for (const squad of platoon.squads) {
+        if (squad.leader && !keeps(squad.leader, company.letter)) squad.leader = null;
+        if (squad.assistantLeader && !keeps(squad.assistantLeader, company.letter)) {
+          squad.assistantLeader = null;
+        }
+        squad.members = squad.members.filter((m) => keeps(m, company.letter));
+      }
+    }
+  }
+
+  if (battalion.commander && !keeps(battalion.commander, "")) battalion.commander = null;
+  if (battalion.executiveOfficer && !keeps(battalion.executiveOfficer, "")) battalion.executiveOfficer = null;
+  if (battalion.sergeantMajor && !keeps(battalion.sergeantMajor, "")) battalion.sergeantMajor = null;
+  for (const company of battalion.companies) vacateCompany(company);
+  vacateCompany(unassigned);
+
+  // The tag's job is done once committed — same convention buildSplitRoster
+  // follows for its own troopers.
+  for (const soldier of collectAllSoldiers({ battalion, unassigned })) delete soldier.splitStatus;
+
+  return { battalion, unassigned };
+}
+
+export interface VacancyChain {
+  // e.g. "Able (A) — Commander", matching computeVacancyReport's label style.
+  billetLabel: string;
+  // Structural units (not people) that sit below this billet in the chain
+  // of command — e.g. ["Platoon 1", "Platoon 1 / Squad 1", ...] for a
+  // company-level vacancy. Empty for a squad-level vacancy (nothing below
+  // a squad).
+  affectedUnits: string[];
+}
+
+function companyLabel(company: Company): string {
+  return company.letter === "UNASSIGNED" ? "Unassigned" : `${company.name} (${company.letter})`;
+}
+
+function companySubUnits(company: Company): string[] {
+  const units: string[] = [];
+  for (const platoon of company.platoons) {
+    units.push(`Platoon ${platoon.number}`);
+    for (const squad of platoon.squads) units.push(`Platoon ${platoon.number} / Squad ${squad.number}`);
+  }
+  return units;
+}
+
+function platoonSubUnits(platoon: Platoon): string[] {
+  return platoon.squads.map((squad) => `Platoon ${platoon.number} / Squad ${squad.number}`);
+}
+
+// Compares a source roster against a mirrored roster built from it (see
+// buildMirroredRoster) and reports every *leadership* billet (Assistant
+// Squad Leader and plain members excluded, same convention
+// computeVacancyReport in analytics.ts follows) that was filled in `before`
+// and is vacant in `after`, along with the structural units beneath it —
+// so a leadership hole is visible together with everything under it that
+// now needs attention, not just the single slot. Computed live from
+// whatever the two rosters currently look like, the same way
+// SuggestionPreview/buildSuggestions are computed live from the source
+// roster's current tags rather than frozen at commit time.
+export function computeNewVacancyChains(before: RosterData, after: RosterData): VacancyChain[] {
+  const chains: VacancyChain[] = [];
+
+  // True when a slot held someone in `before` and is empty in `after`.
+  const opened = (beforeSlot: Soldier | null, afterSlot: Soldier | null) => Boolean(beforeSlot) && !afterSlot;
+
+  if (opened(before.battalion.commander, after.battalion.commander)) {
+    chains.push({
+      billetLabel: `${after.battalion.designation} Battalion — Commanding Officer`,
+      affectedUnits: after.battalion.companies.map(companyLabel),
+    });
+  }
+  if (opened(before.battalion.executiveOfficer, after.battalion.executiveOfficer)) {
+    chains.push({
+      billetLabel: `${after.battalion.designation} Battalion — Executive Officer`,
+      affectedUnits: after.battalion.companies.map(companyLabel),
+    });
+  }
+  if (opened(before.battalion.sergeantMajor, after.battalion.sergeantMajor)) {
+    chains.push({
+      billetLabel: `${after.battalion.designation} Battalion — Sergeant Major`,
+      affectedUnits: after.battalion.companies.map(companyLabel),
+    });
+  }
+
+  const beforeCompanies = new Map(before.battalion.companies.map((c) => [c.letter, c]));
+  for (const company of after.battalion.companies) {
+    const beforeCompany = beforeCompanies.get(company.letter);
+    if (!beforeCompany) continue;
+    const label = companyLabel(company);
+
+    if (opened(beforeCompany.commander, company.commander)) {
+      chains.push({ billetLabel: `${label} — Commander`, affectedUnits: companySubUnits(company) });
+    }
+    if (opened(beforeCompany.executiveOfficer, company.executiveOfficer)) {
+      chains.push({ billetLabel: `${label} — Executive Officer`, affectedUnits: companySubUnits(company) });
+    }
+    if (opened(beforeCompany.firstSergeant, company.firstSergeant)) {
+      chains.push({ billetLabel: `${label} — First Sergeant`, affectedUnits: companySubUnits(company) });
+    }
+
+    const beforePlatoons = new Map(beforeCompany.platoons.map((p) => [p.number, p]));
+    for (const platoon of company.platoons) {
+      const beforePlatoon = beforePlatoons.get(platoon.number);
+      if (!beforePlatoon) continue;
+
+      if (opened(beforePlatoon.leader, platoon.leader)) {
+        chains.push({
+          billetLabel: `${label} — Platoon ${platoon.number} Leader`,
+          affectedUnits: platoonSubUnits(platoon),
+        });
+      }
+      if (opened(beforePlatoon.sergeant, platoon.sergeant)) {
+        chains.push({
+          billetLabel: `${label} — Platoon ${platoon.number} Sergeant`,
+          affectedUnits: platoonSubUnits(platoon),
+        });
+      }
+
+      const beforeSquads = new Map(beforePlatoon.squads.map((s) => [s.number, s]));
+      for (const squad of platoon.squads) {
+        const beforeSquad = beforeSquads.get(squad.number);
+        if (!beforeSquad) continue;
+        if (opened(beforeSquad.leader, squad.leader)) {
+          chains.push({
+            billetLabel: `${label} — Platoon ${platoon.number} / Squad ${squad.number} Leader`,
+            affectedUnits: [],
+          });
+        }
+      }
+    }
+  }
+
+  return chains;
 }

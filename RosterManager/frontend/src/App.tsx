@@ -47,7 +47,7 @@ import { OrgChart } from "./components/OrgChart";
 import { RosterListView } from "./components/RosterListView";
 import { RosterFilterBar } from "./components/RosterFilterBar";
 import { EMPTY_FILTER, type RosterFilter } from "./lib/filterRoster";
-import { buildSplitRoster, CHARLIE_LETTER, SPLIT_GROUPS } from "./lib/splitReorg";
+import { buildMirroredRoster, buildSplitRoster, CHARLIE_LETTER, SPLIT_GROUPS } from "./lib/splitReorg";
 import { applySplitTags, type SplitTagImportResult, type SplitTagRow } from "./lib/splitTagImport";
 import { fillDefaultPracticeTimes } from "./lib/practiceDefaults";
 import { SplitPlanner } from "./components/SplitPlanner";
@@ -83,8 +83,12 @@ function App() {
   useEffect(() => {
     const activeConfig = rosterList.find((r) => r.id === rosterId)?.configuration;
     const currentSummary = rosterList.find((r) => r.id === rosterId);
-    const suggestionStatus =
+    const resolvedStatus =
       activeConfig === "new" ? (SPLIT_GROUPS.find((g) => g.name === currentSummary?.name)?.status ?? null) : null;
+    // HLLV mirrors the source roster's structure at commit time (see
+    // buildMirroredRoster) rather than starting from a pool, so a
+    // from-scratch suggested structure doesn't apply to it.
+    const suggestionStatus = resolvedStatus === "hllv" ? null : resolvedStatus;
     const splitSourceId = suggestionStatus ? currentSummary?.splitSourceId : undefined;
     setSourceRosterForSuggestions(splitSourceId ? loadRoster(splitSourceId) : null);
   }, [rosterId, rosterList]);
@@ -351,15 +355,19 @@ function App() {
     if (!roster || !rosterId) return;
     if (
       !window.confirm(
-        "Commit the split? Everyone tagged HLLV or HLLWW2 lands in that battalion's Unassigned pool " +
-          "(sorted by rank) under an empty battalion, ready for you to build structure around. " +
+        "Commit the split? HLLV mirrors 2-7's current structure, vacating only the billets held by " +
+          "people tagged HLLWW2. HLLWW2 gets an empty battalion with everyone tagged for it in its " +
+          "Unassigned pool (sorted by rank), ready for you to build structure around. " +
           "If the HLLV/HLLWW2 rosters already exist, their contents are replaced.",
       )
     ) {
       return;
     }
     for (const { name, status } of SPLIT_GROUPS) {
-      const built = buildSplitRoster(roster, status, name, rankOrder ?? undefined, roster.intactTransfers ?? []);
+      const built =
+        status === "hllv"
+          ? buildMirroredRoster(roster, status, name, roster.intactTransfers ?? [])
+          : buildSplitRoster(roster, status, name, rankOrder ?? undefined, roster.intactTransfers ?? []);
       const existing = rosterList.find((r) => r.name === name);
       if (existing) {
         saveRoster(existing.id, built);
@@ -478,22 +486,30 @@ function App() {
   // Tagging only makes sense on the split's *source* roster — hide the
   // toggles entirely on rosters that are themselves split outputs.
   const splitStatusHandler = activeConfiguration === "new" ? undefined : handleSetSplitStatus;
+  const currentSummary = rosterList.find((r) => r.id === rosterId);
+  const resolvedSuggestionStatus =
+    activeConfiguration === "new"
+      ? (SPLIT_GROUPS.find((g) => g.name === currentSummary?.name)?.status ?? null)
+      : null;
   // The default pool wording is about B/ACD, which is wrong for a split
-  // output where the pool holds this battalion's committed-but-unplaced troopers.
+  // output — HLLV's pool is whatever's left of the real Unassigned/B-ACD
+  // pool after mirroring (see buildMirroredRoster), while HLLWW2's pool
+  // holds this battalion's committed-but-unplaced troopers.
   const poolTitle = activeConfiguration === "new" ? "Pool" : undefined;
   const poolHint =
-    activeConfiguration === "new"
-      ? "Troopers committed to this battalion, sorted by rank — assign Battalion HQ first, then build companies around your leadership (see Split Planner)."
-      : undefined;
+    resolvedSuggestionStatus === "hllv"
+      ? "Whatever's left of the Unassigned/B-ACD pool after the split — HLLV's structure otherwise mirrors 2-7 directly (see Split Planner)."
+      : resolvedSuggestionStatus === "hllww2"
+        ? "Troopers committed to this battalion, sorted by rank — assign Battalion HQ first, then build companies around your leadership (see Split Planner)."
+        : undefined;
   // Drag & Drop's "Suggest structure" action needs the SOURCE roster's tags
   // + practice times — resolvable via splitSourceId, recorded on this roster
   // at Commit Split time (not the optional, user-set "old"/"new" tag).
   // sourceRosterForSuggestions itself is loaded in the effect above.
-  const currentSummary = rosterList.find((r) => r.id === rosterId);
-  const suggestionStatus =
-    activeConfiguration === "new"
-      ? (SPLIT_GROUPS.find((g) => g.name === currentSummary?.name)?.status ?? null)
-      : null;
+  // HLLV mirrors the source roster's structure at commit time (see
+  // buildMirroredRoster) rather than starting from a pool, so a
+  // from-scratch suggested structure doesn't apply to it.
+  const suggestionStatus = resolvedSuggestionStatus === "hllv" ? null : resolvedSuggestionStatus;
 
   return (
     <section id="center" style={{ alignItems: "stretch", maxWidth: tab === "dragdrop" ? "1400px" : "900px" }}>

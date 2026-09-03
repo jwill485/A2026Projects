@@ -297,20 +297,51 @@ stays usable throughout:
    list under the button while any fail: zero undecided troopers (phase
    1), practice times accepted (phase 2), and leadership review accepted
    (phase 3). Generates (or, on re-run, overwrites) the two
-   `HLLV`/`HLLWW2` rosters. Deliberately does **not** carry the old 2-7
-   structure over: each new roster is an **empty battalion** (designation =
-   battalion name, HQ vacant, no companies) with everyone tagged for it in
-   the Unassigned pool, sorted by rank, split tags cleared. Structure gets
-   built deliberately in phase 5 around the leadership actually available.
+   `HLLV`/`HLLWW2` rosters, but the two are built very differently
+   (`splitReorg.ts`):
+   - **HLLV** (`buildMirroredRoster`) **mirrors 2-7's current structure
+     wholesale** — every company, platoon, and squad is cloned as-is,
+     since HLLV is the priority battalion and inherits almost everyone.
+     Only the billets held by people tagged HLLWW2 get vacated in place
+     (an intact-transferred company's billets all vacate together,
+     overriding any individual member's personal tag — same precedent as
+     intact transfers elsewhere). Practice times carry over for free
+     since the squads themselves aren't rebuilt.
+   - **HLLWW2** (`buildSplitRoster`, the original behavior) still does
+     **not** carry the old structure over: an **empty battalion**
+     (designation = battalion name, HQ vacant, no companies) with
+     everyone tagged for it in the Unassigned pool, sorted by rank.
+     Structure gets built deliberately in phase 5 around the leadership
+     actually available.
+
+   Split tags are cleared on commit either way. Because a freshly
+   committed roster's baseline is saved identical to what was just
+   built, HLLV mirroring means nobody who keeps their billet ever shows
+   up as a change — only someone later moved into (or out of) a billet
+   does, via the same change-log machinery (§2.7) everything else uses.
 5. **Unit Builder** — per battalion, the planner tracks HQ fill (x/3),
    companies created, company-leadership fill, and pool remaining, with an
    **Open in Drag & Drop** button that switches roster + tab in one click.
-   Each battalion card also shows a **💡 Suggested structure**
-   (`buildSuggestions.ts`): old squads kept intact as units, clustered by
-   practice time into proposed companies, each squad annotated with its
-   source (e.g. "from A/1/2"), headcount, and MOS makeup. Sizing follows
-   each battalion's structure standards (`STRUCTURE_RULES`) rather than a
-   fixed shape:
+   What each battalion's card shows below those stats differs, matching
+   how phase 4 built it:
+   - **HLLV** shows **⚠ New leadership vacancies**
+     (`computeNewVacancyChains` in `splitReorg.ts`, rendered by
+     `VacancyChainList.tsx`): every leadership billet (through Squad
+     Leader; Assistant Squad Leader and plain members excluded, same
+     convention as the vacancy report in §2.8) that was filled on the
+     source roster and is now vacant on HLLV, each with the structural
+     units underneath it that also need attention (a vacated Company
+     Commander lists that company's platoons and squads; a vacated
+     Platoon Leader lists that platoon's squads; a vacated Squad Leader
+     lists nothing further down). Computed live from the source roster's
+     current structure vs. HLLV's current structure on every render, not
+     frozen at commit time.
+   - **HLLWW2** shows a **💡 Suggested structure**
+     (`buildSuggestions.ts`): old squads kept intact as units, clustered by
+     practice time into proposed companies, each squad annotated with its
+     source (e.g. "from A/1/2"), headcount, and MOS makeup. Sizing follows
+     each battalion's structure standards (`STRUCTURE_RULES`) rather than a
+     fixed shape:
 
    | | min squads/platoon | min platoons/company | company count |
    |---|---|---|---|

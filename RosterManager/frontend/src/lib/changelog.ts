@@ -8,10 +8,10 @@ export interface LocationInfo {
   // by leadership.ts to classify tier by billet rather than rank.
   kind: SlotPath["kind"];
   // Raw structural fields behind `label`, for callers that need the pieces
-  // rather than the human-readable string — see slashPath()/billetPhrase()
-  // below, used by the Transfer Post generator. Unset battalion/platoon/
-  // squad fields mean "not applicable at this kind" (e.g. no platoon number
-  // for a company-level billet).
+  // rather than the human-readable string — see slashPath() below, used by
+  // the Transfer Post generator. Unset battalion/platoon/squad fields mean
+  // "not applicable at this kind" (e.g. no platoon number for a
+  // company-level billet).
   battalionDesignation: string;
   companyLetter: string;
   platoonNumber?: string;
@@ -210,43 +210,9 @@ function slashPath(loc: LocationInfo): string {
   }
 }
 
-// How a billet reads in "...Assigned to <path> as <phrase>". Deliberately
-// prose, not the raw position title (e.g. "the Squad Leader", not "Squad
-// Leader D/1/2/E/2-7").
-function billetPhrase(kind: SlotPath["kind"]): string {
-  switch (kind) {
-    case "battalionCommander":
-      return "the Battalion Commander";
-    case "battalionXO":
-      return "the Battalion Executive Officer";
-    case "battalionSGM":
-      return "the Battalion Sergeant Major";
-    case "companyCommander":
-      return "the Company Commander";
-    case "companyXO":
-      return "the Company Executive Officer";
-    case "company1SG":
-      return "the First Sergeant";
-    case "platoonLeader":
-      return "the Platoon Leader";
-    case "platoonSergeant":
-      return "the Platoon Sergeant";
-    case "squadLeader":
-      return "the Squad Leader";
-    case "squadAssistantLeader":
-      return "the Assistant Squad Leader";
-    case "squadMember":
-      return "a trooper";
-    case "unassignedPool":
-      return "unassigned";
-  }
-}
-
 export interface TransferPost {
   soldier: Soldier;
-  fromPath: string;
   toPath: string;
-  billetPhrase: string;
 }
 
 export function milpacsProfileUrl(userId: string): string {
@@ -267,12 +233,7 @@ export function computeTransfers(baseline: RosterData, current: RosterData): Tra
   for (const [id, a] of after) {
     const b = before.get(id);
     if (!b || b.label === a.label) continue;
-    transfers.push({
-      soldier: a.soldier,
-      fromPath: slashPath(b),
-      toPath: slashPath(a),
-      billetPhrase: billetPhrase(a.kind),
-    });
+    transfers.push({ soldier: a.soldier, toPath: slashPath(a) });
   }
   return transfers.sort((x, y) => x.soldier.realName.localeCompare(y.soldier.realName));
 }
@@ -281,5 +242,5 @@ export function computeTransfers(baseline: RosterData, current: RosterData): Tra
 // new thread/post.
 export function transferPostSentence(t: TransferPost): string {
   const link = `[URL=${milpacsProfileUrl(t.soldier.userId)}]${t.soldier.username}[/URL]`;
-  return `${t.soldier.rankFull} ${link} is hereby Transferred from ${t.fromPath} and Assigned to ${t.toPath} as ${t.billetPhrase}, MOS ${t.soldier.mos}.`;
+  return `${t.soldier.rankFull} ${link} is hereby transferred and assigned to ${t.toPath}, retaining the MOS of ${t.soldier.mos}.`;
 }

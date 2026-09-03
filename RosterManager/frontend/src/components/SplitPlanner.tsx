@@ -9,10 +9,11 @@ import {
   computeSquadMos,
 } from "../lib/analytics";
 import { bucketByTier, TIER_LABELS, TIER_ORDER, tierRankSummary } from "../lib/leadership";
-import { CHARLIE_LETTER, intactExcludedLetters, SPLIT_GROUPS } from "../lib/splitReorg";
+import { CHARLIE_LETTER, computeNewVacancyChains, intactExcludedLetters, SPLIT_GROUPS } from "../lib/splitReorg";
 import { suggestCompanies, type SuggestedCompany } from "../lib/buildSuggestions";
 import { parseSplitTagCsv, type SplitTagImportResult, type SplitTagRow } from "../lib/splitTagImport";
 import { SuggestionPreview } from "./SuggestionPreview";
+import { VacancyChainList } from "./VacancyChainList";
 import "./SplitPlanner.css";
 
 type PhaseState = "done" | "active" | "todo";
@@ -214,10 +215,16 @@ export function SplitPlanner({
   // suggestCompanies clusters/bins the whole source roster by practice time
   // and classifies leadership tiers — heavy enough to be worth hoisting out
   // of the JSX .map() below and memoizing, since this ran fresh on every
-  // render for both battalions otherwise.
+  // render for both battalions otherwise. Only meaningful for HLLWW2 — HLLV
+  // mirrors the source roster's structure directly (see buildMirroredRoster
+  // in splitReorg.ts), so there's no pool to suggest a structure from.
   const buildSuggestions = useMemo(() => {
     const map = new Map<SplitStatus, { companies: SuggestedCompany[]; warnings: string[] }>();
     for (const b of builds) {
+      if (b.status === "hllv") {
+        map.set(b.status, { companies: [], warnings: [] });
+        continue;
+      }
       // Suggestions come from the SOURCE roster's tags + practice times, so
       // they're only meaningful when planning from it.
       map.set(
@@ -229,6 +236,21 @@ export function SplitPlanner({
             })
           : { companies: [], warnings: [] },
       );
+    }
+    return map;
+  }, [builds, roster, activeConfiguration]);
+
+  // HLLV's counterpart to buildSuggestions: which leadership billets the
+  // split just opened up (their holder left for HLLWW2), and what's
+  // underneath each one. Computed live from the source roster's current
+  // structure vs. HLLV's current structure, same "live, not frozen at
+  // commit time" pattern buildSuggestions already uses.
+  const vacancyChains = useMemo(() => {
+    const map = new Map<SplitStatus, ReturnType<typeof computeNewVacancyChains>>();
+    for (const b of builds) {
+      map.set(b.status, b.status === "hllv" && b.data && activeConfiguration !== "new"
+        ? computeNewVacancyChains(roster, b.data)
+        : []);
     }
     return map;
   }, [builds, roster, activeConfiguration]);
@@ -506,9 +528,11 @@ export function SplitPlanner({
           <PhaseChip state={commitState} />
         </header>
         <p>
-          Creates (or refreshes) one roster per battalion. Everyone tagged for it lands in that roster's{" "}
-          <strong>Unassigned pool</strong>, sorted by rank, under an empty battalion — structure comes in
-          the next step. Safe to re-run as tags change; it overwrites the same two rosters.
+          Creates (or refreshes) one roster per battalion. <strong>HLLV</strong> mirrors 2-7's current
+          structure, vacating only the billets held by people tagged HLLWW2.{" "}
+          <strong>HLLWW2</strong> gets an empty battalion with everyone tagged for it in its Unassigned
+          pool, sorted by rank — structure comes in the next step. Safe to re-run as tags change; it
+          overwrites the same two rosters.
         </p>
         <button
           className="add-btn commit-split-btn"
@@ -533,9 +557,11 @@ export function SplitPlanner({
           <PhaseChip state={buildState} />
         </header>
         <p>
-          In each new roster: assign <strong>Battalion CO/XO/SGM</strong> first (drag from the Unassigned
-          pool onto Battalion HQ), then <strong>+ Add Company</strong> for each company you have leadership
-          for, fill its CO/XO/1SG, and build platoons and squads down from there.
+          <strong>HLLV</strong> already has its structure — fill the newly-vacant billets flagged below,
+          working top-down through each one's chain. <strong>HLLWW2</strong> starts empty: assign{" "}
+          <strong>Battalion CO/XO/SGM</strong> first (drag from the Unassigned pool onto Battalion HQ),
+          then <strong>+ Add Company</strong> for each company you have leadership for, fill its CO/XO/1SG,
+          and build platoons and squads down from there.
         </p>
         {builds.length === 0 ? (
           <p className="tier-empty">Run Commit Split to create the battalion rosters first.</p>
@@ -546,6 +572,7 @@ export function SplitPlanner({
                 companies: [],
                 warnings: [],
               };
+              const chains = vacancyChains.get(b.status) ?? [];
               return (
                 <div key={b.status} className={`group-card group-${b.status}`}>
                   <h4>{b.name}</h4>
@@ -557,14 +584,18 @@ export function SplitPlanner({
                     </li>
                     <li className={b.poolLeft === 0 ? "stat-done" : ""}>Still in pool: {b.poolLeft}</li>
                   </ul>
-                  <SuggestionPreview
-                    battalionName={b.name}
-                    status={b.status}
-                    suggestions={suggestions}
-                    warnings={suggestionWarnings}
-                    onApply={() => onApplySuggestion(b.summary!.id, suggestions)}
-                    applyLabel={`Apply suggested structure to ${b.name}`}
-                  />
+                  {b.status === "hllv" ? (
+                    <VacancyChainList chains={chains} />
+                  ) : (
+                    <SuggestionPreview
+                      battalionName={b.name}
+                      status={b.status}
+                      suggestions={suggestions}
+                      warnings={suggestionWarnings}
+                      onApply={() => onApplySuggestion(b.summary!.id, suggestions)}
+                      applyLabel={`Apply suggested structure to ${b.name}`}
+                    />
+                  )}
                   <button className="add-btn" onClick={() => onOpenRoster(b.summary!.id)}>
                     Open {b.name} in Drag &amp; Drop
                   </button>
