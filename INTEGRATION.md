@@ -8,8 +8,7 @@ doc replaces it.)
 
 ## What these apps actually do
 
-Three small tools built for running the regiment day to day, plus one
-shared front door that ties them together.
+Three small tools built for managing a few leadership initiatives.
 
 **Roster Manager** — pulls the live regiment roster from the 7cav API and
 renders it as an interactive org chart (Battalion → Company → Platoon →
